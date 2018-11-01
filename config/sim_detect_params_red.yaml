@@ -1,0 +1,6 @@
+## SIMULATION BALLOONS
+# RED BALLOONS
+color_center: 179
+color_range: 15
+min_brightness: 1
+min_saturation: 100

@@ -1,0 +1,24 @@
+<launch>
+
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+  <arg name="world_file" default="$(find mrs_main)/config/world_simulation.yaml"/>
+
+  <group ns="$(arg uav_name)">
+    
+    <node name="object_detect" pkg="object_detect" type="object_detect" output="screen" >
+      
+      <rosparam file="$(arg world_file)" />
+      <rosparam file="$(find object_detect)/config/sim_detect_params_common.yaml" />
+      <rosparam file="$(find object_detect)/config/sim_detect_params_red.yaml" />
+      <param name="uav_name" value="$(arg uav_name)" />
+
+      <remap from="~dm_image" to="realsense/camera/depth/image_raw" />
+      <remap from="~dm_camera_info" to="realsense/camera/depth/camera_info" />
+      <remap from="~rgb_image" to="realsense/camera/color/image_raw" />
+      <remap from="~rgb_camera_info" to="realsense/camera/color/camera_info" />
+
+    </node>
+  
+  </group>
+
+</launch>
