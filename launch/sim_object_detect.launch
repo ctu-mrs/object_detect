@@ -8,7 +8,7 @@
 
   <group ns="$(arg uav_name)">
     
-    <node name="object_detect" pkg="object_detect" type="object_detect" output="screen" launch-prefix="$(arg launch_prefix)" >
+    <node pkg="nodelet" type="nodelet" name="object_detect" args="standalone object_detect/ObjectDetector" output="screen" launch-prefix="$(arg launch_prefix)" >
       
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find object_detect)/config/sim_detect_params_common.yaml" />

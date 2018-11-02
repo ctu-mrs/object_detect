@@ -1,5 +1,5 @@
 <library path="lib/libObjectDetector">
-  <class name="object_detect/LocalizeSinObjectDetector" type="object_detect::ObjectDetector" base_class_type="nodelet::Nodelet">
+  <class name="object_detect/ObjectDetector" type="object_detect::ObjectDetector" base_class_type="nodelet::Nodelet">
     <description>Nodelet for object detection using aligned rgb and depth image</description>
   </class>
 </library>

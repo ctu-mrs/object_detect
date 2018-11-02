@@ -1,12 +1,12 @@
 #include "utility_fcs.h"
 
-Eigen::Vector3d project(float px_x, float px_y, const image_geometry::PinholeCameraModel& camera_model)
+Eigen::Vector3f project(float px_x, float px_y, const image_geometry::PinholeCameraModel& camera_model)
 {
   cv::Point2f det_pt(px_x, px_y);
   if (!camera_model.distortionCoeffs().empty())
     det_pt = camera_model.rectifyPoint(det_pt);  // do not forget to rectify the points! (not necessary for Realsense)
-  cv::Point3d cv_vec = camera_model.projectPixelTo3dRay(det_pt);
-  return Eigen::Vector3d(cv_vec.x, cv_vec.y, cv_vec.z).normalized();
+  cv::Point3f cv_vec = camera_model.projectPixelTo3dRay(det_pt);
+  return Eigen::Vector3f(cv_vec.x, cv_vec.y, cv_vec.z).normalized();
 }
 
 float depth2range(float d, float u, float v, float fx, float fy, float cx, float cy)

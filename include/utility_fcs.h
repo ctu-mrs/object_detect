@@ -8,7 +8,7 @@
 
 /** Utility functions //{**/
 
-Eigen::Vector3d project(float px_x, float px_y, const image_geometry::PinholeCameraModel& camera_model);
+Eigen::Vector3f project(float px_x, float px_y, const image_geometry::PinholeCameraModel& camera_model);
 
 float depth2range(float d, float u, float v, float fx, float fy, float cx, float cy);
 

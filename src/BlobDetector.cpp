@@ -301,7 +301,6 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, cv::OutputArray threshold
 }
 //}
 
-
 /* Params constructor //{ */
 Params::Params(drcfg_t cfg)
 {

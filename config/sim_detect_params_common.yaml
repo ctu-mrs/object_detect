@@ -1,4 +1,5 @@
 ############### Distance estimation parameters ###############
+object_radius_known: true
 object_radius: 0.25
 # distance estimation from object size parameters
 max_dist: 30.0

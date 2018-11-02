@@ -12,7 +12,7 @@
 #include <sensor_msgs/PointCloud.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/TransformStamped.h>
-#include <std_msgs/Float64.h>
+#include <std_msgs/Float32.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Transform.h>
@@ -96,6 +96,7 @@ namespace object_detect
 
       /* Parameters, loaded from ROS //{ */
       std::string m_world_frame;
+      bool m_object_radius_known;
       double m_object_radius;
       double m_max_dist;
       double m_max_dist_diff;
@@ -127,6 +128,14 @@ namespace object_detect
       image_geometry::PinholeCameraModel m_dm_camera_model;
       image_geometry::PinholeCameraModel m_rgb_camera_model;
   
+    private:
+      // --------------------------------------------------------------
+      // |                       Helper methods                       |
+      // --------------------------------------------------------------
+
+      bool distance_valid(float distance);
+      float estimate_distance_from_known_size(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float known_size);
+      float estimate_distance_from_depthmap(const cv::Point2f& area_center, float area_radius, const cv::Mat& dm_img, const cv::Mat& binary_img, cv::InputOutputArray dbg_img = cv::noArray());
   };
   
   //}

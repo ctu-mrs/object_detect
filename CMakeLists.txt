@@ -92,12 +92,12 @@ set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -g -O0")
 #   ${OpenCV_LIBRARIES}
 # )
 
-add_library(object_detect src/object_detect.cpp src/BlobDetector.cpp src/utility_fcs.cpp)
-add_dependencies(object_detect
+add_library(ObjectDetector src/ObjectDetector.cpp src/BlobDetector.cpp src/utility_fcs.cpp)
+add_dependencies(ObjectDetector
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
 )
-target_link_libraries(object_detect
+target_link_libraries(ObjectDetector
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
