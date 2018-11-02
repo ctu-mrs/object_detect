@@ -24,6 +24,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_sensor_msgs
   tf2_eigen
   tf2_geometry_msgs
+  nodelet
 )
 
 find_file(DISTCC_FULL_PATH distcc)
@@ -48,7 +49,7 @@ set(Eigen_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIRS})
 set(Eigen_LIBRARIES ${Eigen_LIBRARIES})
 
 generate_dynamic_reconfigure_options(
-  config/detect_params.cfg
+  config/DetectionParams.cfg
 )
 
 catkin_package(
@@ -91,7 +92,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -g -O0")
 #   ${OpenCV_LIBRARIES}
 # )
 
-add_executable(object_detect src/object_detect.cpp src/BlobDetector.cpp src/utility_fcs.cpp)
+add_library(object_detect src/object_detect.cpp src/BlobDetector.cpp src/utility_fcs.cpp)
 add_dependencies(object_detect
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}

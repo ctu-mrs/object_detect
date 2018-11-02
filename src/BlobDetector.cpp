@@ -110,6 +110,8 @@ std::vector<Blob> BlobDetector::findBlobs(cv::Mat binary_image) const
       blob.radius = (dists[(dists.size() - 1) / 2] + dists[dists.size() / 2]) / 2.;
     }
 
+    blob.contours.push_back(contours[contourIdx]);
+
     blobs_ret.push_back(blob);
   }
 
@@ -117,7 +119,7 @@ std::vector<Blob> BlobDetector::findBlobs(cv::Mat binary_image) const
 }
 //}
 
-/* BlobDetector::detect() method //{ */
+/* BlobDetector::detect_blobs() method //{ */
 std::vector<Blob> BlobDetector::detect_blobs(cv::Mat binary_image) const
 {
   // these blobs will be grouped, filtered, and only some of them will be returned
@@ -287,7 +289,7 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, cv::OutputArray threshold
   }
 
   //}
-
+  
   std::vector<Blob> blobs = detect_blobs(binary_img);
 
   if (thresholded_img.needed())

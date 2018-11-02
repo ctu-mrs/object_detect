@@ -5,6 +5,7 @@
 // ROS includes
 #include <ros/package.h>
 #include <ros/ros.h>
+#include <nodelet/nodelet.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
@@ -43,6 +44,7 @@
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/SubscribeHandler.h>
 #include <mrs_lib/DynamicReconfigureMgr.h>
+#include <mrs_lib/Profiler.h>
 
 // Includes from this package
 #include <object_detect/DetectionParamsConfig.h>
@@ -52,5 +54,83 @@
 //}
 
 #define cot(x) tan(M_PI_2 - x)
+
+namespace object_detect
+{
+  // shortcut type to the dynamic reconfigure manager template instance
+  typedef mrs_lib::DynamicReconfigureMgr<object_detect::DetectionParamsConfig> drmgr_t;
+
+  /* //{ class BalloonPlanner */
+
+  class ObjectDetector : public nodelet::Nodelet
+  {
+
+    private:
+
+      /* pos_cov_t helper struct //{ */
+      struct pos_cov_t
+      {
+        Eigen::Vector3d position;
+        Eigen::Matrix3d covariance;
+      };
+      //}
+    
+    public:
+      ObjectDetector() : m_node_name("ObjectDetector") {};
+      virtual void onInit();
+
+      bool m_is_initialized;
+
+    private:
+      const std::string m_node_name;
+      void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
+
+    private:
+      std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
+
+    private:
+
+      // --------------------------------------------------------------
+      // |                ROS-related member variables                |
+      // --------------------------------------------------------------
+
+      /* Parameters, loaded from ROS //{ */
+      std::string m_world_frame;
+      double m_object_radius;
+      double m_max_dist;
+      double m_max_dist_diff;
+      double m_min_depth;
+      double m_max_depth;
+      //}
+
+      /* ROS related variables (subscribers, timers etc.) //{ */
+      std::unique_ptr<drmgr_t> m_drmgr_ptr;
+      tf2_ros::Buffer m_tf_buffer;
+      std::unique_ptr<tf2_ros::TransformListener> m_tf_listener_ptr;
+
+      mrs_lib::SubscribeHandlerPtr<sensor_msgs::ImageConstPtr> m_sh_dm;
+      mrs_lib::SubscribeHandlerPtr<sensor_msgs::CameraInfo> m_sh_dm_cinfo;
+      mrs_lib::SubscribeHandlerPtr<sensor_msgs::ImageConstPtr> m_sh_rgb;
+      mrs_lib::SubscribeHandlerPtr<sensor_msgs::CameraInfo> m_sh_rgb_cinfo;
+
+      ros::Publisher m_pub_pcl;
+      ros::Publisher m_pub_debug;
+
+      ros::Timer m_main_loop_timer;
+      //}
+
+    private:
+      // --------------------------------------------------------------
+      // |                       Other variables                      |
+      // --------------------------------------------------------------
+
+      image_geometry::PinholeCameraModel m_dm_camera_model;
+      image_geometry::PinholeCameraModel m_rgb_camera_model;
+  
+  };
+  
+  //}
+
+}  // namespace object_detect
 
 #endif // OBJECT_DETECT_H
