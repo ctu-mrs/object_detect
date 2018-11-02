@@ -79,17 +79,10 @@ namespace object_detect
       ObjectDetector() : m_node_name("ObjectDetector") {};
       virtual void onInit();
 
-      bool m_is_initialized;
-
     private:
-      const std::string m_node_name;
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
 
     private:
-      std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
-
-    private:
-
       // --------------------------------------------------------------
       // |                ROS-related member variables                |
       // --------------------------------------------------------------
@@ -125,17 +118,28 @@ namespace object_detect
       // |                       Other variables                      |
       // --------------------------------------------------------------
 
+      //{
+      const std::string m_node_name;
+      bool m_is_initialized;
+      std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
       image_geometry::PinholeCameraModel m_dm_camera_model;
       image_geometry::PinholeCameraModel m_rgb_camera_model;
+      //}
   
     private:
       // --------------------------------------------------------------
       // |                       Helper methods                       |
       // --------------------------------------------------------------
 
+      //{
+      // Checks whether a calculated distance is valid
       bool distance_valid(float distance);
+      // Estimates distance of an object based on the 3D vectors pointing to its edges and known distance between those edges
       float estimate_distance_from_known_size(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float known_size);
+      // Estimates distance based on information from a depthmap, masked using the binary thresholded image, optionally marks used pixels in the debug image
       float estimate_distance_from_depthmap(const cv::Point2f& area_center, float area_radius, const cv::Mat& dm_img, const cv::Mat& binary_img, cv::InputOutputArray dbg_img = cv::noArray());
+      //}
+
   };
   
   //}
