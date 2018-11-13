@@ -72,7 +72,7 @@ namespace object_detect
         //}
         
         /* Estimate distance based on known size of object if applicable //{ */
-        float estimated_distance;
+        float estimated_distance = 0.0f;
         bool estimated_distance_valid = false;
         if (m_object_radius_known)
         {
@@ -89,7 +89,7 @@ namespace object_detect
         //}
 
         /* Evaluate the resulting distance and its quality //{ */
-        float resulting_distance;
+        float resulting_distance = 0.0f;
         int resulting_distance_quality = 0;
         if (estimated_distance_valid && depthmap_distance_valid)
         {
