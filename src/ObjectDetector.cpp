@@ -19,17 +19,24 @@ namespace object_detect
       m_rgb_camera_model.fromCameraInfo(m_sh_rgb_cinfo->get_data());
     //}
 
+    const bool rgb_ready = m_sh_rgb->new_data() && m_sh_rgb_cinfo->used_data();
+    const bool dm_ready = m_sh_dm->new_data() && m_sh_dm_cinfo->used_data();
+
     // Check if we got all required messages
-    if (m_sh_dm->new_data() && m_sh_dm_cinfo->used_data() && m_sh_rgb->new_data() && m_sh_rgb_cinfo->used_data())
+    if (rgb_ready)
     {
       
       /* Copy values from subscribers to local variables //{ */
-      ros::Time start_t = ros::Time::now();
-      const sensor_msgs::ImageConstPtr dm_img_msg = m_sh_dm->get_data();
-      cv_bridge::CvImageConstPtr dm_img_ros = cv_bridge::toCvShare(dm_img_msg, sensor_msgs::image_encodings::TYPE_16UC1);
-      const cv::Mat dm_img(dm_img_ros->image);
+      const ros::Time start_t = ros::Time::now();
+      cv::Mat dm_img;
+      if (dm_ready)
+      {
+        const sensor_msgs::ImageConstPtr dm_img_msg = m_sh_dm->get_data();
+        const cv_bridge::CvImageConstPtr dm_img_ros = cv_bridge::toCvShare(dm_img_msg, sensor_msgs::image_encodings::TYPE_16UC1);
+        dm_img = dm_img_ros->image;
+      }
       const sensor_msgs::ImageConstPtr rgb_img_msg = m_sh_rgb->get_data();
-      cv_bridge::CvImageConstPtr rgb_img_ros = cv_bridge::toCvShare(rgb_img_msg, sensor_msgs::image_encodings::BGR8);
+      const cv_bridge::CvImageConstPtr rgb_img_ros = cv_bridge::toCvShare(rgb_img_msg, sensor_msgs::image_encodings::BGR8);
       const cv::Mat rgb_img = rgb_img_ros->image;
       cv::Mat thresholded_img;
       //}
@@ -82,10 +89,15 @@ namespace object_detect
         }
         //}
 
-        /* Get distance from depthmap //{ */
-        float depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, thresholded_img);
-        cout << "Depthmap distance: " << depthmap_distance << endl;
-        bool depthmap_distance_valid = distance_valid(depthmap_distance);
+        /* Get distance from depthmap if applicable //{ */
+        float depthmap_distance;
+        bool depthmap_distance_valid = false;
+        if (dm_ready)
+        {
+          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, thresholded_img);
+          cout << "Depthmap distance: " << depthmap_distance << endl;
+          depthmap_distance_valid = distance_valid(depthmap_distance);
+        }
         //}
 
         /* Evaluate the resulting distance and its quality //{ */
