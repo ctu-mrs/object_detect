@@ -48,6 +48,7 @@
 
 // Includes from this package
 #include <object_detect/DetectionParamsConfig.h>
+#include "SegConf.h"
 #include "BlobDetector.h"
 #include "utility_fcs.h"
 
@@ -59,6 +60,40 @@ namespace object_detect
 {
   // shortcut type to the dynamic reconfigure manager template instance
   typedef mrs_lib::DynamicReconfigureMgr<object_detect::DetectionParamsConfig> drmgr_t;
+
+  // THESE MUST CORRESPOND TO THE VALUES, SPECIFIED IN THE DYNAMIC RECONFIGURE SCRIPT (DetectionParams.cfg)!
+  static std::map<std::string, int> color2id =
+    {
+      {"red", 0},
+      {"green", 1},
+      {"blue", 2},
+      {"yellow", 3},
+    };
+  static std::map<std::string, int> binname2id =
+    {
+      {"hsv", 0},
+      {"lab", 1},
+    };
+
+  /* binarization_method_id() and color_id() helper functions //{ */
+  int color_id(std::string name)
+  {
+    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+    if (color2id.find(name) == std::end(color2id))
+      return -1;
+    else
+      return color2id.at(name);
+  }
+
+  int binarization_method_id(std::string name)
+  {
+    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+    if (binname2id.find(name) == std::end(binname2id))
+      return -1;
+    else
+      return binname2id.at(name);
+  }
+  //}
 
   /* //{ class BalloonPlanner */
 
@@ -81,6 +116,8 @@ namespace object_detect
 
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
+      SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
+      std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
 
     private:
       // --------------------------------------------------------------

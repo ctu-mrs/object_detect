@@ -273,6 +273,58 @@ namespace object_detect
   }
   //}
 
+  /* load_segmentation_config() method //{ */
+  SegConf ObjectDetector::load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name)
+  {
+    SegConf ret;
+  
+    ret.color = color_id(cfg_name);
+  
+    std::string bin_method;
+    pl.load_param(cfg_name + "/binarization_method", bin_method);
+    ret.method = binarization_method_id(bin_method);
+  
+    // Load HSV thresholding params
+    pl.load_param(cfg_name + "/hue_center", ret.hue_center, -1.0);
+    pl.load_param(cfg_name + "/hue_range", ret.hue_range, -1.0);
+    pl.load_param(cfg_name + "/sat_center", ret.sat_center, -1.0);
+    pl.load_param(cfg_name + "/sat_range", ret.sat_range, -1.0);
+    pl.load_param(cfg_name + "/val_center", ret.val_center, -1.0);
+    pl.load_param(cfg_name + "/val_range", ret.val_range, -1.0);
+  
+    // Load L*a*b* thresholding params
+    pl.load_param(cfg_name + "/l_center", ret.l_center, -1.0);
+    pl.load_param(cfg_name + "/l_range", ret.l_range, -1.0);
+    pl.load_param(cfg_name + "/a_center", ret.a_center, -1.0);
+    pl.load_param(cfg_name + "/a_range", ret.a_range, -1.0);
+    pl.load_param(cfg_name + "/b_center", ret.b_center, -1.0);
+    pl.load_param(cfg_name + "/b_range", ret.b_range, -1.0);
+  
+    return ret;
+  }
+  //}
+
+  /* load_color_configs() method //{ */
+  std::vector<SegConf> ObjectDetector::load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str)
+  {
+    std::vector<SegConf> seg_confs;
+    std::stringstream ss(colors_str);
+    std::string color_name;
+    while (std::getline(ss, color_name))
+    {
+      // remove whitespaces
+      color_name.erase(std::remove_if(color_name.begin(), color_name.end(), ::isspace), color_name.end());
+      // skip empty color_names (such as the last one)
+      if (!color_name.empty())
+      {
+        SegConf seg_conf = load_segmentation_config(pl, color_name);
+        seg_confs.push_back(seg_conf);
+      }
+    }
+    return seg_confs;
+  }
+  //}
+
   /* onInit() method //{ */
 
   void ObjectDetector::onInit()
@@ -288,14 +340,20 @@ namespace object_detect
     // LOAD STATIC PARAMETERS
     ROS_INFO("Loading static parameters:");
     // Load the detection parameters
-    pl.load_param("object_radius_known", m_object_radius_known);
-    if (m_object_radius_known)
-      pl.load_param("object_radius", m_object_radius);
+    pl.load_param("object_radius", m_object_radius, -1.0);
+    m_object_radius_known = m_object_radius > 0;
     pl.load_param("max_dist", m_max_dist);
     pl.load_param("max_dist_diff", m_max_dist_diff);
     pl.load_param("min_depth", m_min_depth);
     pl.load_param("max_depth", m_max_depth);
     double loop_rate = pl.load_param2<double>("loop_rate", 100);
+    std::string colors_str;
+    pl.load_param("colors", colors_str);
+    std::vector<SegConf> seg_confs = load_color_configs(pl, colors_str);
+    /* SegConf seg_red = load_segmentation_config(pl, "red"); */
+    /* SegConf seg_green = load_segmentation_config(pl, "green"); */
+    /* SegConf seg_blue = load_segmentation_config(pl, "blue"); */
+    /* SegConf seg_yellow = load_segmentation_config(pl, "yellow"); */
 
     // LOAD DYNAMIC PARAMETERS
     m_drmgr_ptr = std::make_unique<drmgr_t>(nh, m_node_name);

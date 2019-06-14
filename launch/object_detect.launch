@@ -4,7 +4,7 @@
 
   <arg name="debug" default="false" />
   <arg unless="$(arg debug)" name="launch_prefix" value=""/>
-  <arg     if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
+  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch"/>
 
   <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml"/>
 
@@ -25,11 +25,13 @@
       
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
-      <rosparam file="$(find object_detect)/config/Red.yaml" />
-      <rosparam file="$(find object_detect)/config/Green.yaml" />
-      <rosparam file="$(find object_detect)/config/Blue.yaml" />
-      <rosparam file="$(find object_detect)/config/Yellow.yaml" />
       <param name="uav_name" value="$(arg uav_name)" />
+
+      <param name="colors" command="bash $(find object_detect)/scripts/load_colors.sh '$(find object_detect)/config/colors' '/$(arg uav_name)/object_detect'" />
+      <!-- <rosparam file="$(find object_detect)/config/colors/Red.yaml" /> -->
+      <!-- <rosparam file="$(find object_detect)/config/colors/Green.yaml" /> -->
+      <!-- <rosparam file="$(find object_detect)/config/colors/Blue.yaml" /> -->
+      <!-- <rosparam file="$(find object_detect)/config/colors/Yellow.yaml" /> -->
 
       <remap from="~dm_image" to="$(arg depthmap_image)" />
       <remap from="~dm_camera_info" to="$(arg depthmap_cinfo)" />
