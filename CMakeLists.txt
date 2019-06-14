@@ -17,7 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   mrs_msgs
   mrs_lib
-  mrs_mav_manager
+  mrs_uav_manager
   tf2
   tf2_ros
   tf2_msgs
@@ -26,20 +26,6 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_geometry_msgs
   nodelet
 )
-
-find_file(DISTCC_FULL_PATH distcc)
-find_file(DISTCPP_FULL_PATH distg++)
-IF (EXISTS ${DISTCC_FULL_PATH})
-  IF (EXISTS ${DISTCPP_FULL_PATH})
-    message(STATUS "Found distcc and distg++, using distributed compilation")
-    SET(CMAKE_C_COMPILER ${DISTCC_FULL_PATH})
-    SET(CMAKE_CXX_COMPILER ${DISTCPP_FULL_PATH})
-  ELSE()
-    message(WARNING "Found only distcc, but not distg++, not using distributed compilation")
-  ENDIF()
-ELSE()
-  message(STATUS "Not found distcc, not using distributed compilation")
-ENDIF()
 
 find_package(OpenCV 3.2 REQUIRED)
 

@@ -40,7 +40,7 @@
 
 // MRS includes
 #include <mrs_lib/ConvexPolygon.h>   // for ConvexPolygon
-#include <mrs_mav_manager/Tracker.h> // for safetyArea
+#include <mrs_uav_manager/Tracker.h> // for safetyArea
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/SubscribeHandler.h>
 #include <mrs_lib/DynamicReconfigureMgr.h>
