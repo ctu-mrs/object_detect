@@ -25,7 +25,6 @@ namespace object_detect
     // Check if we got all required messages
     if (rgb_ready)
     {
-      
       /* Copy values from subscribers to local variables //{ */
       const ros::Time start_t = ros::Time::now();
       cv::Mat dm_img;
