@@ -1,7 +1,23 @@
 <launch>
 
   <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
-  <arg name="world_file" default="$(find mrs_main)/config/world_simulation.yaml"/>
+
+  <arg name="debug" default="false" />
+  <arg unless="$(arg debug)" name="launch_prefix" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
+
+  <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml"/>
+
+  <arg name="color_image" value="rs_d435/color/image_rect_color"/>
+  <arg name="color_cinfo" value="rs_d435/color/camera_info"/>
+  <arg name="depthmap_image" value="rs_d435/aligned_depth_to_color/image_raw"/>
+  <arg name="depthmap_cinfo" value="rs_d435/aligned_depth_to_color/camera_info"/>
+
+  <arg name="standalone" default="true" />
+  <arg name="manager" default="detection_nodelet_manager" />
+  <arg name="nodelet_name" value="object_detect/ObjectDetector" />
+  <arg unless="$(arg standalone)" name="nodelet_load" value="load $(arg nodelet_name) $(arg manager)"/>
+  <arg     if="$(arg standalone)" name="nodelet_load" value="standalone $(arg nodelet_name)"/>
 
   <group ns="$(arg uav_name)">
     
@@ -9,13 +25,16 @@
       
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
-      <rosparam file="$(find object_detect)/config/detect_params_green.yaml" />
+      <rosparam file="$(find object_detect)/config/Red.yaml" />
+      <rosparam file="$(find object_detect)/config/Green.yaml" />
+      <rosparam file="$(find object_detect)/config/Blue.yaml" />
+      <rosparam file="$(find object_detect)/config/Yellow.yaml" />
       <param name="uav_name" value="$(arg uav_name)" />
 
-      <remap from="~dm_image" to="rs_d435/aligned_depth_to_color/image_raw" />
-      <remap from="~dm_camera_info" to="rs_d435/aligned_depth_to_color/camera_info" />
-      <remap from="~rgb_image" to="rs_d435/color/image_rect_color" />
-      <remap from="~rgb_camera_info" to="rs_d435/color/camera_info" />
+      <remap from="~dm_image" to="$(arg depthmap_image)" />
+      <remap from="~dm_camera_info" to="$(arg depthmap_cinfo)" />
+      <remap from="~rgb_image" to="$(arg color_image)" />
+      <remap from="~rgb_camera_info" to="$(arg color_cinfo)" />
 
     </node>
   

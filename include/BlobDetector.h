@@ -72,6 +72,8 @@ namespace object_detect
     private:
       std::vector<Blob> findBlobs(cv::Mat binary_image) const;
       std::vector<Blob> detect_blobs(cv::Mat binary_image) const;
+      cv::Mat threshold_hsv(cv::Mat in_img);
+      cv::Mat threshold_lab(cv::Mat in_img);
 
   };
 
