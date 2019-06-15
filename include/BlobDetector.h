@@ -8,6 +8,7 @@
 
 // local includes
 #include <object_detect/DetectionParamsConfig.h>
+#include "SegConf.h"
 
 namespace object_detect
 {
@@ -63,7 +64,7 @@ namespace object_detect
   {
     public:
       BlobDetector(const drcfg_t& dr_config);
-      std::vector<Blob> detect(cv::Mat in_img, cv::OutputArray thresholded_img = cv::noArray());
+      std::vector<Blob> detect(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img = cv::noArray());
 
     private:
       drcfg_t m_drcfg;

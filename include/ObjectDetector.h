@@ -118,6 +118,7 @@ namespace object_detect
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
       SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
       std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
+      void highlight_mask(cv::Mat& img, cv::Mat mask, cv::Scalar color);
 
     private:
       // --------------------------------------------------------------
@@ -132,6 +133,7 @@ namespace object_detect
       double m_max_dist_diff;
       double m_min_depth;
       double m_max_depth;
+      std::vector<SegConf> m_seg_confs;
       //}
 
       /* ROS related variables (subscribers, timers etc.) //{ */

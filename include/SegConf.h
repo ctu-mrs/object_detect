@@ -3,8 +3,10 @@
 
 struct SegConf
 {
-  int color;
-  int method;
+  bool active;
+
+  int color;   // id of the color, segmented using this config
+  int method;  // id of the segmentation method used
 
   // HSV thresholding parameters
   double hue_center;

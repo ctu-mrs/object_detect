@@ -52,7 +52,9 @@ namespace object_detect
 
       /* Detect blobs of required color in the RGB image //{ */
       BlobDetector blob_det(m_drmgr_ptr->config);
-      const vector<Blob> blobs = blob_det.detect(rgb_img, thresholded_img);
+      const vector<Blob> blobs = blob_det.detect(rgb_img, m_seg_confs, thresholded_img);
+      if (publish_debug)
+        highlight_mask(dbg_img, thresholded_img, cv::Scalar(0, 0, 128));
       //}
 
       /* Calculate 3D positions of the detected blobs //{ */
@@ -273,11 +275,22 @@ namespace object_detect
   }
   //}
 
+  /* highlight_mask() method //{ */
+  void ObjectDetector::highlight_mask(cv::Mat& img, cv::Mat mask, cv::Scalar color)
+  {
+    cv::Mat colored_mask;
+    cvtColor(mask, colored_mask, COLOR_GRAY2BGR);
+    colored_mask = (colored_mask - color);
+    img = img - colored_mask;
+  }
+  //}
+
   /* load_segmentation_config() method //{ */
   SegConf ObjectDetector::load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name)
   {
     SegConf ret;
   
+    ret.active = true;
     ret.color = color_id(cfg_name);
   
     std::string bin_method;
@@ -285,20 +298,20 @@ namespace object_detect
     ret.method = binarization_method_id(bin_method);
   
     // Load HSV thresholding params
-    pl.load_param(cfg_name + "/hue_center", ret.hue_center, -1.0);
-    pl.load_param(cfg_name + "/hue_range", ret.hue_range, -1.0);
-    pl.load_param(cfg_name + "/sat_center", ret.sat_center, -1.0);
-    pl.load_param(cfg_name + "/sat_range", ret.sat_range, -1.0);
-    pl.load_param(cfg_name + "/val_center", ret.val_center, -1.0);
-    pl.load_param(cfg_name + "/val_range", ret.val_range, -1.0);
+    pl.load_param(cfg_name + "/hsv/hue_center", ret.hue_center);
+    pl.load_param(cfg_name + "/hsv/hue_range", ret.hue_range);
+    pl.load_param(cfg_name + "/hsv/sat_center", ret.sat_center);
+    pl.load_param(cfg_name + "/hsv/sat_range", ret.sat_range);
+    pl.load_param(cfg_name + "/hsv/val_center", ret.val_center);
+    pl.load_param(cfg_name + "/hsv/val_range", ret.val_range);
   
     // Load L*a*b* thresholding params
-    pl.load_param(cfg_name + "/l_center", ret.l_center, -1.0);
-    pl.load_param(cfg_name + "/l_range", ret.l_range, -1.0);
-    pl.load_param(cfg_name + "/a_center", ret.a_center, -1.0);
-    pl.load_param(cfg_name + "/a_range", ret.a_range, -1.0);
-    pl.load_param(cfg_name + "/b_center", ret.b_center, -1.0);
-    pl.load_param(cfg_name + "/b_range", ret.b_range, -1.0);
+    pl.load_param(cfg_name + "/lab/l_center", ret.l_center);
+    pl.load_param(cfg_name + "/lab/l_range", ret.l_range);
+    pl.load_param(cfg_name + "/lab/a_center", ret.a_center);
+    pl.load_param(cfg_name + "/lab/a_range", ret.a_range);
+    pl.load_param(cfg_name + "/lab/b_center", ret.b_center);
+    pl.load_param(cfg_name + "/lab/b_range", ret.b_range);
   
     return ret;
   }
@@ -349,11 +362,7 @@ namespace object_detect
     double loop_rate = pl.load_param2<double>("loop_rate", 100);
     std::string colors_str;
     pl.load_param("colors", colors_str);
-    std::vector<SegConf> seg_confs = load_color_configs(pl, colors_str);
-    /* SegConf seg_red = load_segmentation_config(pl, "red"); */
-    /* SegConf seg_green = load_segmentation_config(pl, "green"); */
-    /* SegConf seg_blue = load_segmentation_config(pl, "blue"); */
-    /* SegConf seg_yellow = load_segmentation_config(pl, "yellow"); */
+    m_seg_confs = load_color_configs(pl, colors_str);
 
     // LOAD DYNAMIC PARAMETERS
     m_drmgr_ptr = std::make_unique<drmgr_t>(nh, m_node_name);
