@@ -95,7 +95,7 @@ namespace object_detect
   }
   //}
 
-  /* //{ class BalloonPlanner */
+  /* //{ class ObjectDetector */
 
   class ObjectDetector : public nodelet::Nodelet
   {
@@ -119,6 +119,7 @@ namespace object_detect
       SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
       std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
       void highlight_mask(cv::Mat& img, cv::Mat mask, cv::Scalar color);
+      std::vector<SegConf> get_active_segmentation_configs(const std::vector<SegConf>& all_seg_confs, int color_id);
 
     private:
       // --------------------------------------------------------------

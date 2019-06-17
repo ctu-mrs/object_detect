@@ -51,8 +51,9 @@ namespace object_detect
       //}
 
       /* Detect blobs of required color in the RGB image //{ */
+      std::vector<SegConf> active_seg_confs = get_active_segmentation_configs(m_seg_confs, m_drmgr_ptr->config.segment_color);
       BlobDetector blob_det(m_drmgr_ptr->config);
-      const vector<Blob> blobs = blob_det.detect(rgb_img, m_seg_confs, thresholded_img);
+      const vector<Blob> blobs = blob_det.detect(rgb_img, active_seg_confs, thresholded_img);
       if (publish_debug)
         highlight_mask(dbg_img, thresholded_img, cv::Scalar(0, 0, 128));
       //}
@@ -188,6 +189,20 @@ namespace object_detect
     
   }
   //}
+
+  std::vector<SegConf> ObjectDetector::get_active_segmentation_configs(const std::vector<SegConf>& all_seg_confs, int color_id)
+  {
+    if (color_id < 0)
+      return all_seg_confs;
+
+    std::vector<SegConf> ret;
+    for (const auto& seg_conf : all_seg_confs)
+    {
+      if (seg_conf.color == color_id)
+        ret.push_back(seg_conf);
+    }
+    return ret;
+  }
 
   /* distance_valid() method //{ */
   bool ObjectDetector::distance_valid(float distance)
