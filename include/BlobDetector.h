@@ -65,6 +65,7 @@ namespace object_detect
     public:
       BlobDetector(const drcfg_t& dr_config);
       std::vector<Blob> detect(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img = cv::noArray());
+      std::vector<Blob> detect(cv::Mat in_img, const SegConf& seg_conf, cv::OutputArray thresholded_img = cv::noArray());
 
     private:
       drcfg_t m_drcfg;
@@ -73,8 +74,8 @@ namespace object_detect
     private:
       std::vector<Blob> findBlobs(cv::Mat binary_image) const;
       std::vector<Blob> detect_blobs(cv::Mat binary_image) const;
-      cv::Mat threshold_hsv(cv::Mat in_img);
-      cv::Mat threshold_lab(cv::Mat in_img);
+      cv::Mat threshold_hsv(cv::Mat in_img, const SegConf& seg_conf);
+      cv::Mat threshold_lab(cv::Mat in_img, const SegConf& seg_conf);
 
   };
 

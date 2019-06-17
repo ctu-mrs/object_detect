@@ -189,10 +189,22 @@ std::vector<Blob> BlobDetector::detect_blobs(cv::Mat binary_image) const
 }
 //}
 
-/* BlobDetector::detect() method //{ */
-std::vector<Blob> BlobDetector::detect(cv::Mat in_img, cv::OutputArray thresholded_img)
+/* detect() method //{ */
+std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img)
 {
+  std::vector<Blob> blobs;
+  for (const auto& seg_conf : seg_confs)
+  {
+    const auto tmp_blobs = detect(in_img, seg_conf, thresholded_img);
+    blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
+  }
+  return blobs;
+}
+//}
 
+/* BlobDetector::detect() method //{ */
+std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const SegConf& seg_conf, cv::OutputArray thresholded_img)
+{
   /* Preprocess the input image //{ */
 
   // dilate the image if requested
@@ -212,13 +224,13 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, cv::OutputArray threshold
   }
 
   cv::Mat binary_img;
-  switch (m_drcfg.binarization_method)
+  switch (seg_conf.method)
   {
     case 0:
-      binary_img = threshold_hsv(in_img);
+      binary_img = threshold_hsv(in_img, seg_conf);
       break;
     case 1:
-      binary_img = threshold_lab(in_img);
+      binary_img = threshold_lab(in_img, seg_conf);
       break;
   }
 
@@ -262,10 +274,10 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, cv::OutputArray threshold
 //}
 
 /* BlobDetector::threshold_hsv() method //{ */
-cv::Mat BlobDetector::threshold_hsv(cv::Mat in_img)
+cv::Mat BlobDetector::threshold_hsv(cv::Mat in_img, const SegConf& seg_conf)
 {
-  double hue_lower = m_drcfg.hue_center - m_drcfg.hue_range / 2.0;
-  double hue_higher = m_drcfg.hue_center + m_drcfg.hue_range / 2.0;
+  double hue_lower = seg_conf.hue_center - seg_conf.hue_range / 2.0;
+  double hue_higher = seg_conf.hue_center + seg_conf.hue_range / 2.0;
   bool overflow;
   /* calculate the correct bounds for the pixel HSV values //{ */
   {
@@ -283,11 +295,11 @@ cv::Mat BlobDetector::threshold_hsv(cv::Mat in_img)
   }
   //}
 
-  double sat_lower = m_drcfg.sat_center - m_drcfg.sat_range / 2.0;
-  double sat_higher = m_drcfg.sat_center + m_drcfg.sat_range / 2.0;
+  double sat_lower = seg_conf.sat_center - seg_conf.sat_range / 2.0;
+  double sat_higher = seg_conf.sat_center + seg_conf.sat_range / 2.0;
 
-  double val_lower = m_drcfg.val_center - m_drcfg.val_range / 2.0;
-  double val_higher = m_drcfg.val_center + m_drcfg.val_range / 2.0;
+  double val_lower = seg_conf.val_center - seg_conf.val_range / 2.0;
+  double val_higher = seg_conf.val_center + seg_conf.val_range / 2.0;
 
   cv::Mat binary_img;
   // filter the HSV image by color
@@ -331,16 +343,16 @@ cv::Mat BlobDetector::threshold_hsv(cv::Mat in_img)
 //}
 
 /* BlobDetector::threshold_lab() method //{ */
-cv::Mat BlobDetector::threshold_lab(cv::Mat in_img)
+cv::Mat BlobDetector::threshold_lab(cv::Mat in_img, const SegConf& seg_conf)
 {
-  double l_lower = m_drcfg.l_center - m_drcfg.l_range / 2.0;
-  double l_higher = m_drcfg.l_center + m_drcfg.l_range / 2.0;
+  double l_lower = seg_conf.l_center - seg_conf.l_range / 2.0;
+  double l_higher = seg_conf.l_center + seg_conf.l_range / 2.0;
 
-  double a_lower = m_drcfg.a_center - m_drcfg.a_range / 2.0;
-  double a_higher = m_drcfg.a_center + m_drcfg.a_range / 2.0;
+  double a_lower = seg_conf.a_center - seg_conf.a_range / 2.0;
+  double a_higher = seg_conf.a_center + seg_conf.a_range / 2.0;
 
-  double b_lower = m_drcfg.b_center - m_drcfg.b_range / 2.0;
-  double b_higher = m_drcfg.b_center + m_drcfg.b_range / 2.0;
+  double b_lower = seg_conf.b_center - seg_conf.b_range / 2.0;
+  double b_higher = seg_conf.b_center + seg_conf.b_range / 2.0;
 
   cv::Mat binary_img;
   // filter the HSV image by color
