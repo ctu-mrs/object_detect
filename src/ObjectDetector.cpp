@@ -10,7 +10,7 @@ namespace object_detect
 {
 
   /* main_loop() method //{ */
-  void ObjectDetector::main_loop(const ros::TimerEvent& evt)
+  void ObjectDetector::main_loop([[maybe_unused]] const ros::TimerEvent& evt)
   {
     /* Initialize the camera models //{ */
     if (m_sh_dm_cinfo->has_data() && !m_sh_dm_cinfo->used_data())
@@ -295,10 +295,32 @@ namespace object_detect
   /* highlight_mask() method //{ */
   void ObjectDetector::highlight_mask(cv::Mat& img, cv::Mat mask, cv::Scalar color)
   {
-    cv::Mat colored_mask;
-    cvtColor(mask, colored_mask, COLOR_GRAY2BGR);
-    colored_mask = (colored_mask - color);
-    img = img - colored_mask;
+    assert(img.size() == mask.size());
+    assert(img.channels() == 3);
+    assert(mask.channels() == 1);
+    Size size = img.size();
+    if (img.isContinuous() && mask.isContinuous())
+    {
+      size.width *= size.height;
+      size.height = 1;
+    }
+    for (int i = 0; i < size.height; i++)
+    {
+      const uint8_t* sptr = mask.ptr<uint8_t>(i);
+      uint8_t* dptr = img.ptr<uint8_t>(i);
+      for (int j = 0; j < size.width; j++)
+      {
+        if (sptr[j])
+        {
+          uint8_t& r = dptr[3*j + 0];
+          uint8_t& g = dptr[3*j + 1];
+          uint8_t& b = dptr[3*j + 2];
+          r = std::clamp(int(r+color(0)), 0, 255);
+          g = std::clamp(int(g+color(1)), 0, 255);
+          b = std::clamp(int(b+color(2)), 0, 255);
+        }
+      }
+    }
   }
   //}
 
