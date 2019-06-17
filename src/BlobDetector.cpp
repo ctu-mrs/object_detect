@@ -356,14 +356,14 @@ cv::Mat BlobDetector::threshold_hsv(cv::Mat in_img, const SegConf& seg_conf)
 /* BlobDetector::threshold_lab() method //{ */
 cv::Mat BlobDetector::threshold_lab(cv::Mat in_img, const SegConf& seg_conf)
 {
-  double l_lower = seg_conf.l_center - seg_conf.l_range;
-  double l_higher = seg_conf.l_center + seg_conf.l_range;
+  double l_lower = seg_conf.l_center - seg_conf.l_range / 2.0;
+  double l_higher = seg_conf.l_center + seg_conf.l_range / 2.0;
 
-  double a_lower = seg_conf.a_center - seg_conf.a_range;
-  double a_higher = seg_conf.a_center + seg_conf.a_range;
+  double a_lower = seg_conf.a_center - seg_conf.a_range / 2.0;
+  double a_higher = seg_conf.a_center + seg_conf.a_range / 2.0;
 
-  double b_lower = seg_conf.b_center - seg_conf.b_range;
-  double b_higher = seg_conf.b_center + seg_conf.b_range;
+  double b_lower = seg_conf.b_center - seg_conf.b_range / 2.0;
+  double b_higher = seg_conf.b_center + seg_conf.b_range / 2.0;
 
   cv::Mat binary_img;
   // filter the HSV image by color
