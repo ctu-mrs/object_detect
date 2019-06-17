@@ -52,6 +52,8 @@ namespace object_detect
 
       /* Detect blobs of required color in the RGB image //{ */
       std::vector<SegConf> active_seg_confs = get_active_segmentation_configs(m_seg_confs, m_drmgr_ptr->config.segment_color);
+      for (const auto& seg_conf : active_seg_confs)
+        NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
       BlobDetector blob_det(m_drmgr_ptr->config);
       const vector<Blob> blobs = blob_det.detect(rgb_img, active_seg_confs, thresholded_img);
       if (publish_debug)

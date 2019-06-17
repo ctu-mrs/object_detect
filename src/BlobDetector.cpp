@@ -193,11 +193,24 @@ std::vector<Blob> BlobDetector::detect_blobs(cv::Mat binary_image) const
 std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img)
 {
   std::vector<Blob> blobs;
+  cv::Mat mask;
+  if (thresholded_img.needed())
+    mask = cv::Mat::zeros(in_img.size(), CV_8UC1);
   for (const auto& seg_conf : seg_confs)
   {
-    const auto tmp_blobs = detect(in_img, seg_conf, thresholded_img);
+    cv::Mat tmp_img;
+    std::vector<Blob> tmp_blobs;
+    if (thresholded_img.needed())
+      tmp_blobs = detect(in_img, seg_conf, tmp_img);
+    else
+      tmp_blobs = detect(in_img, seg_conf);
+
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
+    if (thresholded_img.needed())
+      cv::bitwise_or(tmp_img, mask, mask);
   }
+  if (thresholded_img.needed())
+    mask.copyTo(thresholded_img);
   return blobs;
 }
 //}
@@ -265,9 +278,7 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const SegConf& seg_conf, 
   std::vector<Blob> blobs = detect_blobs(binary_img);
 
   if (thresholded_img.needed())
-  {
     binary_img.copyTo(thresholded_img);
-  }
 
   return blobs;
 }

@@ -85,6 +85,16 @@ namespace object_detect
       return color2id.at(name);
   }
 
+  std::string color_name(int id)
+  {
+    for (const auto& keyval : color2id)
+    {
+      if (keyval.second == id)
+        return keyval.first;
+    }
+    return "unknown";
+  }
+
   int binarization_method_id(std::string name)
   {
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);

@@ -54,7 +54,7 @@ include_directories(include
   ${Eigen_INCLUDE_DIRS}
 )
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3")
+set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3")
 set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -g -O0")
 
