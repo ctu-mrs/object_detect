@@ -75,7 +75,7 @@ namespace object_detect
         const float radius = blob.radius;
 
         if (publish_debug)
-          cv::circle(dbg_img, center, radius, Scalar(0, 255, 0), 2);
+          cv::circle(dbg_img, center, radius, color_highlight(blob.color), 2);
 
         /* Calculate 3D vector pointing to left and right edges of the detected object //{ */
         const Eigen::Vector3f l_vec = project(center.x - radius*cos(M_PI_4), center.y - radius*sin(M_PI_4), m_rgb_camera_model);
