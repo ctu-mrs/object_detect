@@ -120,7 +120,7 @@ std::vector<Blob> BlobDetector::findBlobs(cv::Mat binary_image) const
 //}
 
 /* BlobDetector::detect_blobs() method //{ */
-std::vector<Blob> BlobDetector::detect_blobs(cv::Mat binary_image) const
+std::vector<Blob> BlobDetector::detect_blobs(cv::Mat binary_image, lut_elem_t color_label) const
 {
   // these blobs will be grouped, filtered, and only some of them will be returned
   std::vector<std::vector<Blob> > blobs;
@@ -173,6 +173,7 @@ std::vector<Blob> BlobDetector::detect_blobs(cv::Mat binary_image) const
     }
     sumPoint *= (1. / normalizer);
     Blob result_blob;
+    result_blob.color = color_label;
     result_blob.confidence = normalizer / cur_blobs.size();
     result_blob.location = sumPoint;
     result_blob.radius = cur_blobs[cur_blobs.size() / 2].radius;
@@ -190,34 +191,10 @@ std::vector<Blob> BlobDetector::detect_blobs(cv::Mat binary_image) const
 //}
 
 /* BlobDetector::detect() method //{ */
-std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img)
+std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const std::vector<SegConf>& seg_confs, cv::OutputArray label_img)
 {
   std::vector<Blob> blobs;
-  cv::Mat mask;
-  if (thresholded_img.needed())
-    mask = cv::Mat::zeros(in_img.size(), CV_8UC1);
-  for (const auto& seg_conf : seg_confs)
-  {
-    cv::Mat tmp_img;
-    std::vector<Blob> tmp_blobs;
-    if (thresholded_img.needed())
-      tmp_blobs = detect(in_img, lut, seg_conf, tmp_img);
-    else
-      tmp_blobs = detect(in_img, lut, seg_conf);
 
-    blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
-    if (thresholded_img.needed())
-      cv::bitwise_or(tmp_img, mask, mask);
-  }
-  if (thresholded_img.needed())
-    mask.copyTo(thresholded_img);
-  return blobs;
-}
-//}
-
-/* BlobDetector::detect() method //{ */
-std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const SegConf& seg_conf, cv::OutputArray thresholded_img)
-{
   /* Preprocess the input image //{ */
 
   // dilate the image if requested
@@ -235,9 +212,29 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const S
   {
     cv::medianBlur(in_img, in_img, m_drcfg.medianblur_size);
   }
+  //}
 
-  const cv::Mat binary_img = segment_image(in_img, lut, seg_conf);
+  const cv::Mat labels_img = segment_image(in_img, lut);
 
+  for (const auto& seg_conf : seg_confs)
+  {
+    cv::Mat tmp_img;
+    std::vector<Blob> tmp_blobs;
+    tmp_blobs = detect_blobs(labels_img, seg_conf);
+    blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
+  }
+  if (label_img.needed())
+    labels_img.copyTo(label_img);
+  return blobs;
+}
+//}
+
+/* BlobDetector::detect_blobs() method //{ */
+std::vector<Blob> BlobDetector::detect_blobs(cv::Mat label_img, const SegConf& seg_conf) const
+{
+  cv::Scalar color_label(seg_conf.color);
+  cv::Mat binary_img;
+  cv::bitwise_and(label_img, color_label, binary_img);
   // fill holes in the image
   switch (m_drcfg.fill_holes)
   {
@@ -265,18 +262,14 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const S
   }
 
   //}
-  
-  std::vector<Blob> blobs = detect_blobs(binary_img);
-
-  if (thresholded_img.needed())
-    binary_img.copyTo(thresholded_img);
+  std::vector<Blob> blobs = detect_blobs(binary_img, seg_conf.color);
 
   return blobs;
 }
 //}
 
 /* BlobDetector::segment_image() method //{ */
-cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut, const SegConf& seg_conf)
+cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut)
 {
   cv::Mat binary_img;
   Size size = in_img.size();
@@ -300,10 +293,7 @@ cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut, const SegC
       const uint8_t cur_b = sptr[3 * j + 0];
       const uint8_t cur_g = sptr[3 * j + 1];
       const uint8_t cur_r = sptr[3 * j + 2];
-      if (lookup_lut(lut, cur_r, cur_g, cur_b) & seg_conf.color)
-        dptr[j] = 255;
-      else
-        dptr[j] = 0;
+      dptr[j] = lookup_lut(lut, cur_r, cur_g, cur_b);
     }
   }
   return binary_img;

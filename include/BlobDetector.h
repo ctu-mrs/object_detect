@@ -18,6 +18,7 @@ namespace object_detect
 
   struct Blob
   {
+    lut_elem_t color;
     double confidence;
     cv::Point2d location;
     double radius;
@@ -65,7 +66,6 @@ namespace object_detect
     public:
       BlobDetector(const drcfg_t& dr_config);
       std::vector<Blob> detect(cv::Mat in_img, const lut_t& lut, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img = cv::noArray());
-      std::vector<Blob> detect(cv::Mat in_img, const lut_t& lut, const SegConf& seg_conf, cv::OutputArray thresholded_img = cv::noArray());
 
     private:
       drcfg_t m_drcfg;
@@ -73,8 +73,9 @@ namespace object_detect
 
     private:
       std::vector<Blob> findBlobs(cv::Mat binary_image) const;
-      std::vector<Blob> detect_blobs(cv::Mat binary_image) const;
-      cv::Mat segment_image(cv::Mat in_img, const lut_t& lut, const SegConf& seg_conf);
+      std::vector<Blob> detect_blobs(cv::Mat in_img, const SegConf& seg_conf) const;
+      std::vector<Blob> detect_blobs(cv::Mat binary_image, lut_elem_t color_label) const;
+      cv::Mat segment_image(cv::Mat in_img, const lut_t& lut);
 
   };
 

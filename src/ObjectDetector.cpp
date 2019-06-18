@@ -37,7 +37,7 @@ namespace object_detect
       const sensor_msgs::ImageConstPtr rgb_img_msg = m_sh_rgb->get_data();
       const cv_bridge::CvImageConstPtr rgb_img_ros = cv_bridge::toCvShare(rgb_img_msg, sensor_msgs::image_encodings::BGR8);
       const cv::Mat rgb_img = rgb_img_ros->image;
-      cv::Mat thresholded_img;
+      cv::Mat label_img;
       //}
 
       /* Prepare debug image if needed //{ */
@@ -55,9 +55,9 @@ namespace object_detect
       for (const auto& seg_conf : active_seg_confs)
         NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
       BlobDetector blob_det(m_drmgr_ptr->config);
-      const vector<Blob> blobs = blob_det.detect(rgb_img, m_cur_lut, active_seg_confs, thresholded_img);
+      const vector<Blob> blobs = blob_det.detect(rgb_img, m_cur_lut, active_seg_confs, label_img);
       if (publish_debug)
-        highlight_mask(dbg_img, thresholded_img, cv::Scalar(0, 0, 128));
+        highlight_mask(dbg_img, label_img);
       //}
 
       /* Calculate 3D positions of the detected blobs //{ */
@@ -98,7 +98,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, thresholded_img);
+          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img);
           cout << "Depthmap distance: " << depthmap_distance << endl;
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -295,31 +295,32 @@ namespace object_detect
   //}
 
   /* highlight_mask() method //{ */
-  void ObjectDetector::highlight_mask(cv::Mat& img, cv::Mat mask, cv::Scalar color)
+  void ObjectDetector::highlight_mask(cv::Mat& img, cv::Mat label_img)
   {
     assert(img.size() == mask.size());
     assert(img.channels() == 3);
     assert(mask.channels() == 1);
     Size size = img.size();
-    if (img.isContinuous() && mask.isContinuous())
+    if (img.isContinuous() && label_img.isContinuous())
     {
       size.width *= size.height;
       size.height = 1;
     }
     for (int i = 0; i < size.height; i++)
     {
-      const uint8_t* sptr = mask.ptr<uint8_t>(i);
+      const uint8_t* sptr = label_img.ptr<uint8_t>(i);
       uint8_t* dptr = img.ptr<uint8_t>(i);
       for (int j = 0; j < size.width; j++)
       {
         if (sptr[j])
         {
-          uint8_t& r = dptr[3*j + 0];
+          const cv::Scalar color = color_highlight(sptr[j]);
+          uint8_t& b = dptr[3*j + 0];
           uint8_t& g = dptr[3*j + 1];
-          uint8_t& b = dptr[3*j + 2];
-          r = std::clamp(int(r+color(0)), 0, 255);
+          uint8_t& r = dptr[3*j + 2];
+          r = std::clamp(int(r+color(2)), 0, 255);
           g = std::clamp(int(g+color(1)), 0, 255);
-          b = std::clamp(int(b+color(2)), 0, 255);
+          b = std::clamp(int(b+color(0)), 0, 255);
         }
       }
     }

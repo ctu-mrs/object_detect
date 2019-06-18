@@ -62,12 +62,12 @@ namespace object_detect
   typedef mrs_lib::DynamicReconfigureMgr<object_detect::DetectionParamsConfig> drmgr_t;
 
   // THESE MUST CORRESPOND TO THE VALUES, SPECIFIED IN THE DYNAMIC RECONFIGURE SCRIPT (DetectionParams.cfg)!
-  static std::map<std::string, int> color2id =
+  static std::map<std::string, std::pair<int, cv::Scalar>> colors =
     {
-      {"red",    ( 0x01 << 0 )},
-      {"green",  ( 0x01 << 1 )},
-      {"blue",   ( 0x01 << 2 )},
-      {"yellow", ( 0x01 << 3 )},
+      {"red",    {( 0x01 << 0 ), cv::Scalar(0, 0, 128)}},
+      {"green",  {( 0x01 << 1 ), cv::Scalar(0, 128, 0)}},
+      {"blue",   {( 0x01 << 2 ), cv::Scalar(128, 0, 0)}},
+      {"yellow", {( 0x01 << 3 ), cv::Scalar(128, 128, 0)}},
     };
   static std::map<std::string, int> binname2id =
     {
@@ -79,17 +79,27 @@ namespace object_detect
   int color_id(std::string name)
   {
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-    if (color2id.find(name) == std::end(color2id))
+    if (colors.find(name) == std::end(colors))
       return -1;
     else
-      return color2id.at(name);
+      return colors.at(name).first;
+  }
+
+  cv::Scalar color_highlight(int id)
+  {
+    for (const auto& keyval : colors)
+    {
+      if (keyval.second.first == id)
+        return keyval.second.second;
+    }
+    return cv::Scalar(0, 0, 128);
   }
 
   std::string color_name(int id)
   {
-    for (const auto& keyval : color2id)
+    for (const auto& keyval : colors)
     {
-      if (keyval.second == id)
+      if (keyval.second.first == id)
         return keyval.first;
     }
     return "unknown";
@@ -128,7 +138,7 @@ namespace object_detect
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
       SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
       std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
-      void highlight_mask(cv::Mat& img, cv::Mat mask, cv::Scalar color);
+      void highlight_mask(cv::Mat& img, cv::Mat label_img);
       std::vector<SegConf> get_active_segmentation_configs(const std::vector<SegConf>& all_seg_confs, int color_id);
 
     private:
