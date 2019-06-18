@@ -297,135 +297,13 @@ cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut, const SegC
     uint8_t* dptr = binary_img.ptr<uint8_t>(i);
     for (int j = 0; j < size.width; j++)
     {
-      const uint8_t cur_r = sptr[3 * j + 0];
+      const uint8_t cur_b = sptr[3 * j + 0];
       const uint8_t cur_g = sptr[3 * j + 1];
-      const uint8_t cur_b = sptr[3 * j + 2];
+      const uint8_t cur_r = sptr[3 * j + 2];
       if (lookup_lut(lut, cur_r, cur_g, cur_b) & seg_conf.color)
         dptr[j] = 255;
       else
         dptr[j] = 0;
-    }
-  }
-  return binary_img;
-}
-//}
-
-/* BlobDetector::threshold_hsv() method //{ */
-cv::Mat BlobDetector::threshold_hsv(cv::Mat in_img, const SegConf& seg_conf)
-{
-  double hue_lower = seg_conf.hue_center - seg_conf.hue_range / 2.0;
-  double hue_higher = seg_conf.hue_center + seg_conf.hue_range / 2.0;
-  bool overflow;
-  /* calculate the correct bounds for the pixel HSV values //{ */
-  {
-    overflow = false;
-    if (hue_lower < 0)
-    {
-      hue_lower += 180;
-      overflow = true;
-    }
-    if (hue_higher > 179)
-    {
-      hue_higher -= 180;
-      overflow = true;
-    }
-  }
-  //}
-
-  double sat_lower = seg_conf.sat_center - seg_conf.sat_range / 2.0;
-  double sat_higher = seg_conf.sat_center + seg_conf.sat_range / 2.0;
-
-  double val_lower = seg_conf.val_center - seg_conf.val_range / 2.0;
-  double val_higher = seg_conf.val_center + seg_conf.val_range / 2.0;
-
-  cv::Mat binary_img;
-  // filter the HSV image by color
-  {
-    cv::Mat hsv_img;
-    // convert the input image to HSV for better filtering
-    cv::cvtColor(in_img, hsv_img, cv::COLOR_BGR2HSV);
-    Size size = hsv_img.size();
-    binary_img.create(size, CV_8UC1);
-    // here is the idiom: check the arrays for continuity and,
-    // if this is the case,
-    // treat the arrays as 1D vectors
-    if (hsv_img.isContinuous() && binary_img.isContinuous())
-    {
-      size.width *= size.height;
-      size.height = 1;
-    }
-    for (int i = 0; i < size.height; i++)
-    {
-      // when the arrays are continuous,
-      // the outer loop is executed only once
-      const uint8_t* sptr = hsv_img.ptr<uint8_t>(i);
-      uint8_t* dptr = binary_img.ptr<uint8_t>(i);
-      for (int j = 0; j < size.width; j++)
-      {
-        const uint8_t cur_h = sptr[3 * j + 0];
-        const uint8_t cur_s = sptr[3 * j + 1];
-        const uint8_t cur_v = sptr[3 * j + 2];
-        const bool h_ok = (!overflow && cur_h > hue_lower && cur_h < hue_higher) || (overflow && (cur_h > hue_lower || cur_h < hue_higher));
-        const bool s_ok = cur_s > sat_lower && cur_s < sat_higher;
-        const bool v_ok = cur_v > val_lower && cur_v < val_higher;
-        if (h_ok && s_ok && v_ok)
-          dptr[j] = 255;
-        else
-          dptr[j] = 0;
-      }
-    }
-  }
-  return binary_img;
-}
-//}
-
-/* BlobDetector::threshold_lab() method //{ */
-cv::Mat BlobDetector::threshold_lab(cv::Mat in_img, const SegConf& seg_conf)
-{
-  double l_lower = seg_conf.l_center - seg_conf.l_range / 2.0;
-  double l_higher = seg_conf.l_center + seg_conf.l_range / 2.0;
-
-  double a_lower = seg_conf.a_center - seg_conf.a_range / 2.0;
-  double a_higher = seg_conf.a_center + seg_conf.a_range / 2.0;
-
-  double b_lower = seg_conf.b_center - seg_conf.b_range / 2.0;
-  double b_higher = seg_conf.b_center + seg_conf.b_range / 2.0;
-
-  cv::Mat binary_img;
-  // filter the HSV image by color
-  {
-    cv::Mat lab_img;
-    // convert the input image to HSV for better filtering
-    cv::cvtColor(in_img, lab_img, cv::COLOR_BGR2Lab);
-    Size size = lab_img.size();
-    binary_img.create(size, CV_8UC1);
-    // here is the idiom: check the arrays for continuity and,
-    // if this is the case,
-    // treat the arrays as 1D vectors
-    if (lab_img.isContinuous() && binary_img.isContinuous())
-    {
-      size.width *= size.height;
-      size.height = 1;
-    }
-    for (int i = 0; i < size.height; i++)
-    {
-      // when the arrays are continuous,
-      // the outer loop is executed only once
-      const uint8_t* sptr = lab_img.ptr<uint8_t>(i);
-      uint8_t* dptr = binary_img.ptr<uint8_t>(i);
-      for (int j = 0; j < size.width; j++)
-      {
-        const uint8_t cur_l = sptr[3 * j + 0];
-        const uint8_t cur_a = sptr[3 * j + 1];
-        const uint8_t cur_b = sptr[3 * j + 2];
-        const bool l_ok = cur_l > l_lower && cur_l < l_higher;
-        const bool a_ok = cur_a > a_lower && cur_a < a_higher;
-        const bool b_ok = cur_b > b_lower && cur_b < b_higher;
-        if (l_ok && a_ok && b_ok)
-          dptr[j] = 255;
-        else
-          dptr[j] = 0;
-      }
     }
   }
   return binary_img;

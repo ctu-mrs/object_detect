@@ -8,8 +8,8 @@
 
   <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml"/>
 
-  <arg name="color_image" value="/usb_cam/image_raw"/>
-  <arg name="color_cinfo" value="/usb_cam/camera_info"/>
+  <arg name="color_image" value="rs_d435/color/image_raw"/>
+  <arg name="color_cinfo" value="rs_d435/color/camera_info"/>
   <arg name="depthmap_image" value="rs_d435/aligned_depth_to_color/image_raw"/>
   <arg name="depthmap_cinfo" value="rs_d435/aligned_depth_to_color/camera_info"/>
 

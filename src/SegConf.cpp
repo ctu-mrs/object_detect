@@ -41,8 +41,8 @@ void add_lut_hsv(lut_t& ret, const SegConf& seg_conf)
         cv::cvtColor(color_rgb, color_hsv, cv::COLOR_RGB2HSV);
         const cv::Vec<uint8_t, 3> hsv = color_hsv.at<cv::Vec<uint8_t, 3>>(0, 0);
         const auto cur_h = hsv[0];
-        const auto cur_s = hsv[0];
-        const auto cur_v = hsv[0];
+        const auto cur_s = hsv[1];
+        const auto cur_v = hsv[2];
         const bool h_ok = (!overflow && cur_h > hue_lower && cur_h < hue_higher) || (overflow && (cur_h > hue_lower || cur_h < hue_higher));
         const bool s_ok = cur_s > sat_lower && cur_s < sat_higher;
         const bool v_ok = cur_v > val_lower && cur_v < val_higher;
@@ -80,8 +80,8 @@ void add_lut_lab(lut_t& ret, const SegConf& seg_conf)
         cv::cvtColor(color_rgb, color_lab, cv::COLOR_RGB2Lab);
         const cv::Vec<uint8_t, 3> lab = color_lab.at<cv::Vec<uint8_t, 3>>(0, 0);
         const auto cur_l = lab[0];
-        const auto cur_a = lab[0];
-        const auto cur_b = lab[0];
+        const auto cur_a = lab[1];
+        const auto cur_b = lab[2];
         const bool l_ok = cur_l > l_lower && cur_l < l_higher;
         const bool a_ok = cur_a > a_lower && cur_a < a_higher;
         const bool b_ok = cur_b > b_lower && cur_b < b_higher;

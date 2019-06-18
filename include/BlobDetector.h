@@ -75,8 +75,6 @@ namespace object_detect
       std::vector<Blob> findBlobs(cv::Mat binary_image) const;
       std::vector<Blob> detect_blobs(cv::Mat binary_image) const;
       cv::Mat segment_image(cv::Mat in_img, const lut_t& lut, const SegConf& seg_conf);
-      cv::Mat threshold_hsv(cv::Mat in_img, const SegConf& seg_conf);
-      cv::Mat threshold_lab(cv::Mat in_img, const SegConf& seg_conf);
 
   };
 
