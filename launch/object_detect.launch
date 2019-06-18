@@ -3,8 +3,11 @@
   <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
 
   <arg name="debug" default="false" />
-  <arg unless="$(arg debug)" name="launch_prefix" value=""/>
-  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch"/>
+  <arg unless="$(arg debug)" name="launch_prefix_debug" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix_debug" value="debug_roslaunch"/>
+  <arg name="profile" default="false" />
+  <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
+  <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
 
   <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml"/>
 
@@ -21,7 +24,7 @@
 
   <group ns="$(arg uav_name)">
     
-    <node pkg="nodelet" type="nodelet" name="object_detect" args="standalone object_detect/ObjectDetector" output="screen" launch-prefix="$(arg launch_prefix)" >
+    <node pkg="nodelet" type="nodelet" name="object_detect" args="standalone object_detect/ObjectDetector" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile)" >
       
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
