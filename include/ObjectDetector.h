@@ -64,10 +64,10 @@ namespace object_detect
   // THESE MUST CORRESPOND TO THE VALUES, SPECIFIED IN THE DYNAMIC RECONFIGURE SCRIPT (DetectionParams.cfg)!
   static std::map<std::string, int> color2id =
     {
-      {"red", 0},
-      {"green", 1},
-      {"blue", 2},
-      {"yellow", 3},
+      {"red",    ( 0x01 << 0 )},
+      {"green",  ( 0x01 << 1 )},
+      {"blue",   ( 0x01 << 2 )},
+      {"yellow", ( 0x01 << 3 )},
     };
   static std::map<std::string, int> binname2id =
     {
@@ -168,9 +168,10 @@ namespace object_detect
       // |                       Other variables                      |
       // --------------------------------------------------------------
 
-      //{
+      /* Other variables //{ */
       const std::string m_node_name;
       bool m_is_initialized;
+      lut_t m_cur_lut;
       std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
       image_geometry::PinholeCameraModel m_dm_camera_model;
       image_geometry::PinholeCameraModel m_rgb_camera_model;

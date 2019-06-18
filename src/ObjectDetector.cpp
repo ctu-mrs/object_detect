@@ -55,7 +55,7 @@ namespace object_detect
       for (const auto& seg_conf : active_seg_confs)
         NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
       BlobDetector blob_det(m_drmgr_ptr->config);
-      const vector<Blob> blobs = blob_det.detect(rgb_img, active_seg_confs, thresholded_img);
+      const vector<Blob> blobs = blob_det.detect(rgb_img, m_cur_lut, active_seg_confs, thresholded_img);
       if (publish_debug)
         highlight_mask(dbg_img, thresholded_img, cv::Scalar(0, 0, 128));
       //}
@@ -192,11 +192,12 @@ namespace object_detect
   }
   //}
 
+  /* get_active_segmentation_configs() method //{ */
   std::vector<SegConf> ObjectDetector::get_active_segmentation_configs(const std::vector<SegConf>& all_seg_confs, int color_id)
   {
     if (color_id < 0)
       return all_seg_confs;
-
+  
     std::vector<SegConf> ret;
     for (const auto& seg_conf : all_seg_confs)
     {
@@ -205,6 +206,7 @@ namespace object_detect
     }
     return ret;
   }
+  //}
 
   /* distance_valid() method //{ */
   bool ObjectDetector::distance_valid(float distance)
@@ -446,6 +448,7 @@ namespace object_detect
 
     //}
 
+    generate_lut(m_cur_lut, m_seg_confs);
     m_is_initialized = true;
 
     /* timers  //{ */

@@ -1,6 +1,8 @@
 #include "SegConf.h"
 
-void fill_lut_hsv(lut_t& ret, const SegConf& seg_conf)
+/* add_lut_hsv() //{ */
+
+void add_lut_hsv(lut_t& ret, const SegConf& seg_conf)
 {
   double hue_lower = seg_conf.hue_center - seg_conf.hue_range / 2.0;
   double hue_higher = seg_conf.hue_center + seg_conf.hue_range / 2.0;
@@ -21,19 +23,19 @@ void fill_lut_hsv(lut_t& ret, const SegConf& seg_conf)
   }
   //}
 
-  double sat_lower = seg_conf.sat_center - seg_conf.sat_range / 2.0;
-  double sat_higher = seg_conf.sat_center + seg_conf.sat_range / 2.0;
+  const double sat_lower = seg_conf.sat_center - seg_conf.sat_range / 2.0;
+  const double sat_higher = seg_conf.sat_center + seg_conf.sat_range / 2.0;
 
-  double val_lower = seg_conf.val_center - seg_conf.val_range / 2.0;
-  double val_higher = seg_conf.val_center + seg_conf.val_range / 2.0;
+  const double val_lower = seg_conf.val_center - seg_conf.val_range / 2.0;
+  const double val_higher = seg_conf.val_center + seg_conf.val_range / 2.0;
 
   cv::Mat color_rgb;
   cv::Mat color_hsv;
-  for (int r = 0; r < 256; r++)
+  for (size_t r = 0; r < lut_dim; r++)
   {
-    for (int g = 0; g < 256; g++)
+    for (size_t g = 0; g < lut_dim; g++)
     {
-      for (int b = 0; b < 256; b++)
+      for (size_t b = 0; b < lut_dim; b++)
       {
         color_rgb = cv::Mat(cv::Size(1, 1), CV_8UC3, cv::Scalar(r, g, b));
         cv::cvtColor(color_rgb, color_hsv, cv::COLOR_RGB2HSV);
@@ -45,29 +47,92 @@ void fill_lut_hsv(lut_t& ret, const SegConf& seg_conf)
         const bool s_ok = cur_s > sat_lower && cur_s < sat_higher;
         const bool v_ok = cur_v > val_lower && cur_v < val_higher;
         if (h_ok && s_ok && v_ok)
-          ret.at(r + 256*g + 256*256*b) = seg_conf.color;
-        else
-          ret.at(r + 256*g + 256*256*b) = 0;
+          ret.at(r + lut_dim*g + lut_dim*lut_dim*b) |= seg_conf.color;
       }
     }
   }
 }
 
-void fill_lut_lab(lut_t& ret, const SegConf& seg_conf)
-{
+//}
 
+/* add_lut_lab //{ */
+
+void add_lut_lab(lut_t& ret, const SegConf& seg_conf)
+{
+  const double l_lower = seg_conf.l_center - seg_conf.l_range / 2.0;
+  const double l_higher = seg_conf.l_center + seg_conf.l_range / 2.0;
+
+  const double a_lower = seg_conf.a_center - seg_conf.a_range / 2.0;
+  const double a_higher = seg_conf.a_center + seg_conf.a_range / 2.0;
+
+  const double b_lower = seg_conf.b_center - seg_conf.b_range / 2.0;
+  const double b_higher = seg_conf.b_center + seg_conf.b_range / 2.0;
+
+  cv::Mat color_rgb;
+  cv::Mat color_lab;
+  for (size_t r = 0; r < lut_dim; r++)
+  {
+    for (size_t g = 0; g < lut_dim; g++)
+    {
+      for (size_t b = 0; b < lut_dim; b++)
+      {
+        color_rgb = cv::Mat(cv::Size(1, 1), CV_8UC3, cv::Scalar(r, g, b));
+        cv::cvtColor(color_rgb, color_lab, cv::COLOR_RGB2Lab);
+        const cv::Vec<uint8_t, 3> lab = color_lab.at<cv::Vec<uint8_t, 3>>(0, 0);
+        const auto cur_l = lab[0];
+        const auto cur_a = lab[0];
+        const auto cur_b = lab[0];
+        const bool l_ok = cur_l > l_lower && cur_l < l_higher;
+        const bool a_ok = cur_a > a_lower && cur_a < a_higher;
+        const bool b_ok = cur_b > b_lower && cur_b < b_higher;
+        if (l_ok && a_ok && b_ok)
+          ret.at(r + lut_dim*g + lut_dim*lut_dim*b) |= seg_conf.color;
+      }
+    }
+  }
 }
 
-void fill_lut(lut_t& ret, const SegConf& seg_conf)
+//}
+
+/* combine_luts() //{ */
+
+void combine_luts(lut_t& ret, const lut_t& lut1, const lut_t& lut2)
+{
+  assert(lut1.size() == lut_dim*lut_dim*lut_dim);
+  assert(lut2.size() == lut_dim*lut_dim*lut_dim);
+  if (ret.size() != lut_dim*lut_dim*lut_dim)
+    ret.resize(lut_dim*lut_dim*lut_dim);
+  for (size_t it = 0; it < lut_dim*lut_dim*lut_dim; it++)
+  {
+    const uint8_t val1 = lut1[it];
+    const uint8_t val2 = lut2[it];
+    ret[it] = val1 | val2;
+  }
+}
+
+//}
+
+void generate_lut(lut_t& ret, const std::vector<SegConf>& seg_confs)
 {
   ret.resize(lut_size);
-  switch (seg_conf.method)
+  for (size_t it = 0; it < lut_size; it++)
+    ret[it] = 0;
+  for (const auto& seg_conf : seg_confs)
   {
-    case 0:
-      fill_lut_hsv(ret, seg_conf);
-      break;
-    case 1:
-      fill_lut_lab(ret, seg_conf);
-      break;
+    switch (seg_conf.method)
+    {
+      case 0:
+        add_lut_hsv(ret, seg_conf);
+        break;
+      case 1:
+        add_lut_lab(ret, seg_conf);
+        break;
+    }
   }
+}
+
+lut_elem_t lookup_lut(const lut_t& lut, size_t r, size_t g, size_t b)
+{
+  assert(lut.size() == lut_size);
+  return lut[r + lut_dim*g + lut_dim*lut_dim*b];
 }

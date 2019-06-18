@@ -5,8 +5,10 @@
 #include <stdint.h>
 #include <opencv2/imgproc/imgproc.hpp>
 
-constexpr auto lut_size = 256*256*256;
-using lut_t = std::vector<uint8_t>;
+constexpr size_t lut_dim = 256;
+constexpr size_t lut_size = lut_dim*lut_dim*lut_dim;
+using lut_elem_t = uint8_t;
+using lut_t = std::vector<lut_elem_t>;
 
 struct SegConf
 {
@@ -33,6 +35,7 @@ struct SegConf
   double b_range;
 };
 
-lut_t generate_lut(const SegConf& seg_conf);
+void generate_lut(lut_t& ret, const std::vector<SegConf>& seg_confs);
+lut_elem_t lookup_lut(const lut_t& lut, size_t r, size_t g, size_t b);
 
 #endif // SEGCONF_H

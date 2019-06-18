@@ -189,8 +189,8 @@ std::vector<Blob> BlobDetector::detect_blobs(cv::Mat binary_image) const
 }
 //}
 
-/* detect() method //{ */
-std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img)
+/* BlobDetector::detect() method //{ */
+std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img)
 {
   std::vector<Blob> blobs;
   cv::Mat mask;
@@ -201,9 +201,9 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
     cv::Mat tmp_img;
     std::vector<Blob> tmp_blobs;
     if (thresholded_img.needed())
-      tmp_blobs = detect(in_img, seg_conf, tmp_img);
+      tmp_blobs = detect(in_img, lut, seg_conf, tmp_img);
     else
-      tmp_blobs = detect(in_img, seg_conf);
+      tmp_blobs = detect(in_img, lut, seg_conf);
 
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
     if (thresholded_img.needed())
@@ -216,7 +216,7 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
 //}
 
 /* BlobDetector::detect() method //{ */
-std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const SegConf& seg_conf, cv::OutputArray thresholded_img)
+std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const SegConf& seg_conf, cv::OutputArray thresholded_img)
 {
   /* Preprocess the input image //{ */
 
@@ -236,16 +236,7 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const SegConf& seg_conf, 
     cv::medianBlur(in_img, in_img, m_drcfg.medianblur_size);
   }
 
-  cv::Mat binary_img;
-  switch (seg_conf.method)
-  {
-    case 0:
-      binary_img = threshold_hsv(in_img, seg_conf);
-      break;
-    case 1:
-      binary_img = threshold_lab(in_img, seg_conf);
-      break;
-  }
+  const cv::Mat binary_img = segment_image(in_img, lut, seg_conf);
 
   // fill holes in the image
   switch (m_drcfg.fill_holes)
@@ -281,6 +272,41 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const SegConf& seg_conf, 
     binary_img.copyTo(thresholded_img);
 
   return blobs;
+}
+//}
+
+/* BlobDetector::segment_image() method //{ */
+cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut, const SegConf& seg_conf)
+{
+  cv::Mat binary_img;
+  Size size = in_img.size();
+  binary_img.create(size, CV_8UC1);
+  // here is the idiom: check the arrays for continuity and,
+  // if this is the case,
+  // treat the arrays as 1D vectors
+  if (in_img.isContinuous() && binary_img.isContinuous())
+  {
+    size.width *= size.height;
+    size.height = 1;
+  }
+  for (int i = 0; i < size.height; i++)
+  {
+    // when the arrays are continuous,
+    // the outer loop is executed only once
+    const uint8_t* sptr = in_img.ptr<uint8_t>(i);
+    uint8_t* dptr = binary_img.ptr<uint8_t>(i);
+    for (int j = 0; j < size.width; j++)
+    {
+      const uint8_t cur_r = sptr[3 * j + 0];
+      const uint8_t cur_g = sptr[3 * j + 1];
+      const uint8_t cur_b = sptr[3 * j + 2];
+      if (lookup_lut(lut, cur_r, cur_g, cur_b) & seg_conf.color)
+        dptr[j] = 255;
+      else
+        dptr[j] = 0;
+    }
+  }
+  return binary_img;
 }
 //}
 
