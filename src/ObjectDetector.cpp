@@ -458,11 +458,11 @@ namespace object_detect
 
     //}
 
+    m_active_seg_confs = get_segmentation_configs(m_seg_confs, {m_drmgr_ptr->config.segment_color});
+    m_prev_color_id = m_drmgr_ptr->config.segment_color;
     ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
     generate_lut(m_cur_lut, m_seg_confs);
     ROS_INFO("[%s]: Lookup table generated", m_node_name.c_str());
-    m_active_seg_confs = get_segmentation_configs(m_seg_confs, {m_drmgr_ptr->config.segment_color});
-    m_prev_color_id = m_drmgr_ptr->config.segment_color;
     m_is_initialized = true;
 
     /* timers  //{ */
