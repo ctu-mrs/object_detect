@@ -100,14 +100,15 @@ std::vector<Blob> BlobDetector::findBlobs(cv::Mat binary_image) const
 
     // compute blob radius
     {
-      std::vector<double> dists;
+      double max_dist = 0.0;
       for (size_t pointIdx = 0; pointIdx < contours[contourIdx].size(); pointIdx++)
       {
         Point2d pt = contours[contourIdx][pointIdx];
-        dists.push_back(norm(blob.location - pt));
+        const double cur_dist = norm(blob.location - pt);
+        if (cur_dist > max_dist)
+          max_dist = cur_dist;
       }
-      std::sort(dists.begin(), dists.end());
-      blob.radius = (dists[(dists.size() - 1) / 2] + dists[dists.size() / 2]) / 2.;
+      blob.radius = max_dist;
     }
 
     blob.contours.push_back(contours[contourIdx]);

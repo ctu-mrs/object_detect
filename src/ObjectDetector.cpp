@@ -102,7 +102,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img);
+          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color);
           cout << "Depthmap distance: " << depthmap_distance << endl;
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -228,7 +228,7 @@ namespace object_detect
   //}
 
   /* estimate_distance_from_depthmap() method //{ */
-  float ObjectDetector::estimate_distance_from_depthmap(const cv::Point2f& area_center, float area_radius, const cv::Mat& dm_img, const cv::Mat& binary_img, cv::InputOutputArray dbg_img)
+  float ObjectDetector::estimate_distance_from_depthmap(const cv::Point2f& area_center, float area_radius, const cv::Mat& dm_img, const cv::Mat& label_img, lut_elem_t color_id, cv::InputOutputArray dbg_img)
   {
     bool publish_debug = dbg_img.needed();
     cv::Mat dbg_mat;
@@ -258,7 +258,8 @@ namespace object_detect
     }
     const cv::Rect roi(tmp_topleft, tmp_botright);
     const cv::Mat tmp_dm_img = dm_img(roi);
-    const cv::Mat tmp_mask = binary_img(roi);
+    cv::Mat tmp_mask;
+    cv::bitwise_and(label_img(roi), cv::Scalar(color_id), tmp_mask);
     cv::Mat tmp_dbg_img = publish_debug ? dbg_mat(roi) : cv::Mat();
     const Size size = tmp_dm_img.size();
   
