@@ -10,7 +10,7 @@ BlobDetector::BlobDetector(const drcfg_t& dr_config)
   m_drcfg = dr_config;
 }
 
-/* BlobDetector::detect_blobs() method //{ */
+/* BlobDetector::find_blobs() method //{ */
 std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut_elem_t color_label) const
 {
   std::vector<Blob> blobs_ret;
@@ -23,20 +23,28 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
     Blob blob;
     blob.confidence = 1;
     Moments moms = moments(Mat(contours[contourIdx]));
+    if (moms.m00 == 0.0)
+      continue;
+    blob.location = Point2d(moms.m10 / moms.m00, moms.m01 / moms.m00);
+
+    // ignore empty contours (not a blob)
+    if (!binary_image.at<uint8_t>(blob.location))
+      continue;
+
     blob.area = moms.m00;
 
     if (m_params.filter_by_area)
     {
-      double area = moms.m00;
+      const double area = moms.m00;
       if (area < m_params.min_area || area >= m_params.max_area)
         continue;
     }
 
     if (m_params.filter_by_circularity)
     {
-      double area = moms.m00;
-      double perimeter = arcLength(Mat(contours[contourIdx]), true);
-      double ratio = 4 * CV_PI * area / (perimeter * perimeter);
+      const double area = moms.m00;
+      const double perimeter = arcLength(Mat(contours[contourIdx]), true);
+      const double ratio = 4 * CV_PI * area / (perimeter * perimeter);
       blob.circularity = ratio;
       if (ratio < m_params.min_circularity || ratio >= m_params.max_circularity)
         continue;
@@ -57,18 +65,18 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
 
     if (m_params.filter_by_inertia)
     {
-      double denominator = std::sqrt(std::pow(2 * moms.mu11, 2) + std::pow(moms.mu20 - moms.mu02, 2));
+      const double denominator = std::sqrt(std::pow(2 * moms.mu11, 2) + std::pow(moms.mu20 - moms.mu02, 2));
       const double eps = 1e-2;
       double ratio;
       if (denominator > eps)
       {
-        double cosmin = (moms.mu20 - moms.mu02) / denominator;
-        double sinmin = 2 * moms.mu11 / denominator;
-        double cosmax = -cosmin;
-        double sinmax = -sinmin;
+        const double cosmin = (moms.mu20 - moms.mu02) / denominator;
+        const double sinmin = 2 * moms.mu11 / denominator;
+        const double cosmax = -cosmin;
+        const double sinmax = -sinmin;
 
-        double imin = 0.5 * (moms.mu20 + moms.mu02) - 0.5 * (moms.mu20 - moms.mu02) * cosmin - moms.mu11 * sinmin;
-        double imax = 0.5 * (moms.mu20 + moms.mu02) - 0.5 * (moms.mu20 - moms.mu02) * cosmax - moms.mu11 * sinmax;
+        const double imin = 0.5 * (moms.mu20 + moms.mu02) - 0.5 * (moms.mu20 - moms.mu02) * cosmin - moms.mu11 * sinmin;
+        const double imax = 0.5 * (moms.mu20 + moms.mu02) - 0.5 * (moms.mu20 - moms.mu02) * cosmax - moms.mu11 * sinmax;
         ratio = imin / imax;
       } else
       {
@@ -86,24 +94,20 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
     {
       std::vector<Point> hull;
       convexHull(Mat(contours[contourIdx]), hull);
-      double area = contourArea(Mat(contours[contourIdx]));
-      double hullArea = contourArea(Mat(hull));
-      double ratio = area / hullArea;
+      const double area = contourArea(Mat(contours[contourIdx]));
+      const double hullArea = contourArea(Mat(hull));
+      const double ratio = area / hullArea;
       blob.convexity = ratio;
       if (ratio < m_params.min_convexity || ratio >= m_params.max_convexity)
         continue;
     }
-
-    if (moms.m00 == 0.0)
-      continue;
-    blob.location = Point2d(moms.m10 / moms.m00, moms.m01 / moms.m00);
 
     // compute blob radius
     {
       double max_dist = 0.0;
       for (size_t pointIdx = 0; pointIdx < contours[contourIdx].size(); pointIdx++)
       {
-        Point2d pt = contours[contourIdx][pointIdx];
+        const Point2d pt = contours[contourIdx][pointIdx];
         const double cur_dist = norm(blob.location - pt);
         if (cur_dist > max_dist)
           max_dist = cur_dist;
@@ -200,6 +204,8 @@ std::vector<Blob> BlobDetector::detect_blobs(cv::Mat label_img, const SegConf& s
 }
 //}
 
+/* class parallelSegment //{ */
+
 class parallelSegment : public ParallelLoopBody
 {
 public:
@@ -224,6 +230,8 @@ private:
     uint8_t* dptr;
     const lut_t& lut;
 };
+
+//}
 
 /* BlobDetector::segment_image() method //{ */
 cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut)
