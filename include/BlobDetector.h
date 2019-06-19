@@ -72,9 +72,8 @@ namespace object_detect
       Params m_params;
 
     private:
-      std::vector<Blob> findBlobs(cv::Mat binary_image) const;
       std::vector<Blob> detect_blobs(cv::Mat in_img, const SegConf& seg_conf) const;
-      std::vector<Blob> detect_blobs(cv::Mat binary_image, lut_elem_t color_label) const;
+      std::vector<Blob> find_blobs(const cv::Mat binary_image, const lut_elem_t color_label) const;
       cv::Mat segment_image(cv::Mat in_img, const lut_t& lut);
 
   };

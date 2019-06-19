@@ -10,8 +10,8 @@ BlobDetector::BlobDetector(const drcfg_t& dr_config)
   m_drcfg = dr_config;
 }
 
-/* BlobDetector::findBlobs() method //{ */
-std::vector<Blob> BlobDetector::findBlobs(cv::Mat binary_image) const
+/* BlobDetector::detect_blobs() method //{ */
+std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut_elem_t color_label) const
 {
   std::vector<Blob> blobs_ret;
   std::vector<std::vector<Point>> contours;
@@ -111,82 +111,12 @@ std::vector<Blob> BlobDetector::findBlobs(cv::Mat binary_image) const
       blob.radius = max_dist;
     }
 
+    blob.color = color_label;
     blob.contours.push_back(contours[contourIdx]);
 
     blobs_ret.push_back(blob);
   }
 
-  return blobs_ret;
-}
-//}
-
-/* BlobDetector::detect_blobs() method //{ */
-std::vector<Blob> BlobDetector::detect_blobs(cv::Mat binary_image, lut_elem_t color_label) const
-{
-  // these blobs will be grouped, filtered, and only some of them will be returned
-  std::vector<std::vector<Blob> > blobs;
-  std::vector<Blob> cur_blobs = findBlobs(binary_image);
-  std::vector<std::vector<Blob> > new_blobs;
-  new_blobs.reserve(cur_blobs.size());
-
-  for (size_t i = 0; i < cur_blobs.size(); i++)
-  {
-    bool isNew = true;
-    for (size_t j = 0; j < blobs.size(); j++)
-    {
-      double dist = norm(blobs[j][blobs[j].size() / 2].location - cur_blobs[i].location);
-      isNew = dist >= m_params.min_dist_between && dist >= blobs[j][blobs[j].size() / 2].radius && dist >= cur_blobs[i].radius;
-      if (!isNew)
-      {
-        blobs[j].push_back(cur_blobs[i]);
-
-        size_t k = blobs[j].size() - 1;
-        while (k > 0 && blobs[j][k].radius < blobs[j][k - 1].radius)
-        {
-          blobs[j][k] = blobs[j][k - 1];
-          k--;
-        }
-        blobs[j][k] = cur_blobs[i];
-
-        break;
-      }
-    }
-    if (isNew)
-      new_blobs.push_back(std::vector<Blob>(1, cur_blobs[i]));
-  }
-  std::copy(new_blobs.begin(), new_blobs.end(), std::back_inserter(blobs));
-
-  std::vector<Blob> blobs_ret;
-  blobs_ret.reserve(blobs.size());
-  for (const vector<Blob>& cur_blobs : blobs)
-  {
-    if (cur_blobs.size() < (size_t)m_params.min_repeatability)
-      continue;
-    Point2d sumPoint(0, 0);
-    double normalizer = 0;
-    vector<vector<Point> > contours;
-    contours.reserve(cur_blobs.size());
-    for (size_t j = 0; j < cur_blobs.size(); j++)
-    {
-      sumPoint += cur_blobs[j].confidence * cur_blobs[j].location;
-      normalizer += cur_blobs[j].confidence;
-      contours.push_back(cur_blobs[j].contours[0]);
-    }
-    sumPoint *= (1. / normalizer);
-    Blob result_blob;
-    result_blob.color = color_label;
-    result_blob.confidence = normalizer / cur_blobs.size();
-    result_blob.location = sumPoint;
-    result_blob.radius = cur_blobs[cur_blobs.size() / 2].radius;
-    result_blob.avg_depth = cur_blobs[cur_blobs.size() / 2].avg_depth;
-    result_blob.convexity = cur_blobs[cur_blobs.size() / 2].convexity;
-    result_blob.angle = cur_blobs[cur_blobs.size() / 2].angle;
-    result_blob.area = cur_blobs[cur_blobs.size() / 2].area;
-    result_blob.circularity = cur_blobs[cur_blobs.size() / 2].circularity;
-    result_blob.inertia = cur_blobs[cur_blobs.size() / 2].inertia;
-    result_blob.contours = contours;
-    blobs_ret.push_back(result_blob);
-  }
   return blobs_ret;
 }
 //}
@@ -236,6 +166,8 @@ std::vector<Blob> BlobDetector::detect_blobs(cv::Mat label_img, const SegConf& s
   cv::Scalar color_label(seg_conf.color);
   cv::Mat binary_img;
   cv::bitwise_and(label_img, color_label, binary_img);
+
+  /* Preprocess the binary image //{ */
   // fill holes in the image
   switch (m_drcfg.fill_holes)
   {
@@ -261,10 +193,9 @@ std::vector<Blob> BlobDetector::detect_blobs(cv::Mat label_img, const SegConf& s
       break;
     }
   }
-
   //}
-  std::vector<Blob> blobs = detect_blobs(binary_img, seg_conf.color);
 
+  std::vector<Blob> blobs = find_blobs(binary_img, seg_conf.color);
   return blobs;
 }
 //}
