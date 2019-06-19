@@ -67,7 +67,8 @@ namespace object_detect
       {"red",    {( 0x01 << 0 ), cv::Scalar(0, 0, 128)}},
       {"green",  {( 0x01 << 1 ), cv::Scalar(0, 128, 0)}},
       {"blue",   {( 0x01 << 2 ), cv::Scalar(128, 0, 0)}},
-      {"yellow", {( 0x01 << 3 ), cv::Scalar(128, 128, 0)}},
+      {"yellow", {( 0x01 << 3 ), cv::Scalar(0, 128, 128)}},
+      {"orange", {( 0x01 << 4 ), cv::Scalar(0, 88, 168)}},
     };
   static std::map<std::string, int> binname2id =
     {
