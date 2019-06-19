@@ -42,6 +42,7 @@ generate_dynamic_reconfigure_options(
 add_service_files(
    FILES
    ColorChange.srv
+   ColorQuery.srv
  )
 
 ## Generate added messages and services with any dependencies listed here

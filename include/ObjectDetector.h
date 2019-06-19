@@ -47,6 +47,7 @@
 // Includes from this package
 #include <object_detect/DetectionParamsConfig.h>
 #include <object_detect/ColorChange.h>
+#include <object_detect/ColorQuery.h>
 #include "SegConf.h"
 #include "BlobDetector.h"
 #include "utility_fcs.h"
@@ -140,6 +141,7 @@ namespace object_detect
       void highlight_mask(cv::Mat& img, cv::Mat label_img);
       std::vector<SegConf> get_segmentation_configs(const std::vector<SegConf>& all_seg_confs, std::vector<int> color_ids);
       bool color_change_callback(object_detect::ColorChange::Request& req, object_detect::ColorChange::Response& resp);
+      bool color_query_callback(object_detect::ColorQuery::Request& req, object_detect::ColorQuery::Response& resp);
 
     private:
       // --------------------------------------------------------------
@@ -172,6 +174,7 @@ namespace object_detect
       ros::Publisher m_pub_debug;
 
       ros::ServiceServer m_color_change_server;
+      ros::ServiceServer m_color_query_server;
 
       ros::Timer m_main_loop_timer;
       //}

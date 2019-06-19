@@ -448,6 +448,7 @@ namespace object_detect
     }
 
     m_color_change_server = nh.advertiseService("change_colors", &ObjectDetector::color_change_callback, this);
+    m_color_query_server = nh.advertiseService("query_colors", &ObjectDetector::color_query_callback, this);
     //}
 
     /* profiler //{ */
@@ -474,6 +475,8 @@ namespace object_detect
 
   //}
 
+  /* ObjectDetector::color_change_callback() method //{ */
+  
   bool ObjectDetector::color_change_callback(object_detect::ColorChange::Request& req, object_detect::ColorChange::Response& resp)
   {
     std::vector<std::string> known_colornames;
@@ -498,7 +501,7 @@ namespace object_detect
         seg_confs.insert(std::end(seg_confs), std::begin(cur_seg_confs), std::end(cur_seg_confs));
       }
     }
-
+  
     if (unknown_colornames.empty())
     {
       m_active_seg_confs = seg_confs;
@@ -530,6 +533,22 @@ namespace object_detect
       return false;
     }
   }
+  
+  //}
+
+  /* ObjectDetector::color_query_callback() method //{ */
+  
+  bool ObjectDetector::color_query_callback(object_detect::ColorQuery::Request& req, object_detect::ColorQuery::Response& resp)
+  {
+    resp.colors.reserve(m_seg_confs.size());
+    for (const auto& seg_conf : m_seg_confs)
+    {
+      resp.colors.push_back(seg_conf.color_name);
+    }
+    return true;
+  }
+  
+  //}
 
 }
 
