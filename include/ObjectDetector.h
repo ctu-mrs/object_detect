@@ -39,8 +39,6 @@
 #include <algorithm>
 
 // MRS includes
-#include <mrs_lib/ConvexPolygon.h>   // for ConvexPolygon
-#include <mrs_uav_manager/Tracker.h> // for safetyArea
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/SubscribeHandler.h>
 #include <mrs_lib/DynamicReconfigureMgr.h>
@@ -48,6 +46,7 @@
 
 // Includes from this package
 #include <object_detect/DetectionParamsConfig.h>
+#include <object_detect/ColorChange.h>
 #include "SegConf.h"
 #include "BlobDetector.h"
 #include "utility_fcs.h"
@@ -139,7 +138,8 @@ namespace object_detect
       SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
       std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
       void highlight_mask(cv::Mat& img, cv::Mat label_img);
-      std::vector<SegConf> get_active_segmentation_configs(const std::vector<SegConf>& all_seg_confs, int color_id);
+      std::vector<SegConf> get_segmentation_configs(const std::vector<SegConf>& all_seg_confs, std::vector<int> color_ids);
+      bool color_change_callback(object_detect::ColorChange::Request& req, object_detect::ColorChange::Response& resp);
 
     private:
       // --------------------------------------------------------------
@@ -155,6 +155,7 @@ namespace object_detect
       double m_min_depth;
       double m_max_depth;
       std::vector<SegConf> m_seg_confs;
+      std::vector<SegConf> m_active_seg_confs;
       //}
 
       /* ROS related variables (subscribers, timers etc.) //{ */
@@ -170,6 +171,8 @@ namespace object_detect
       ros::Publisher m_pub_pcl;
       ros::Publisher m_pub_debug;
 
+      ros::ServiceServer m_color_change_server;
+
       ros::Timer m_main_loop_timer;
       //}
 
@@ -181,6 +184,7 @@ namespace object_detect
       /* Other variables //{ */
       const std::string m_node_name;
       bool m_is_initialized;
+      int m_prev_color_id;
       lut_t m_cur_lut;
       std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
       image_geometry::PinholeCameraModel m_dm_camera_model;

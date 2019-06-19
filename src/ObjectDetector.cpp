@@ -51,11 +51,15 @@ namespace object_detect
       //}
 
       /* Detect blobs of required color in the RGB image //{ */
-      std::vector<SegConf> active_seg_confs = get_active_segmentation_configs(m_seg_confs, m_drmgr_ptr->config.segment_color);
-      for (const auto& seg_conf : active_seg_confs)
+      if (m_prev_color_id != m_drmgr_ptr->config.segment_color)
+      {
+        m_active_seg_confs = get_segmentation_configs(m_seg_confs, {m_drmgr_ptr->config.segment_color});
+        m_prev_color_id = m_drmgr_ptr->config.segment_color;
+      }
+      for (const auto& seg_conf : m_active_seg_confs)
         NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
       BlobDetector blob_det(m_drmgr_ptr->config);
-      const vector<Blob> blobs = blob_det.detect(rgb_img, m_cur_lut, active_seg_confs, label_img);
+      const vector<Blob> blobs = blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
       if (publish_debug)
         highlight_mask(dbg_img, label_img);
       //}
@@ -193,16 +197,16 @@ namespace object_detect
   //}
 
   /* get_active_segmentation_configs() method //{ */
-  std::vector<SegConf> ObjectDetector::get_active_segmentation_configs(const std::vector<SegConf>& all_seg_confs, int color_id)
+  std::vector<SegConf> ObjectDetector::get_segmentation_configs(const std::vector<SegConf>& all_seg_confs, std::vector<int> color_ids)
   {
-    if (color_id < 0)
-      return all_seg_confs;
-  
     std::vector<SegConf> ret;
-    for (const auto& seg_conf : all_seg_confs)
+    for (const auto& color_id : color_ids)
     {
-      if (seg_conf.color == color_id)
-        ret.push_back(seg_conf);
+      for (const auto& seg_conf : all_seg_confs)
+      {
+        if (seg_conf.color == color_id)
+          ret.push_back(seg_conf);
+      }
     }
     return ret;
   }
@@ -334,6 +338,7 @@ namespace object_detect
   
     ret.active = true;
     ret.color = color_id(cfg_name);
+    std::transform(cfg_name.begin(), cfg_name.end(), ret.color_name.begin(), ::tolower);
   
     std::string bin_method;
     pl.load_param(cfg_name + "/binarization_method", bin_method);
@@ -441,6 +446,7 @@ namespace object_detect
       ros::shutdown();
     }
 
+    m_color_change_server = nh.advertiseService("change_colors", &ObjectDetector::color_change_callback, this);
     //}
 
     /* profiler //{ */
@@ -449,7 +455,11 @@ namespace object_detect
 
     //}
 
+    ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
     generate_lut(m_cur_lut, m_seg_confs);
+    ROS_INFO("[%s]: Lookup table generated", m_node_name.c_str());
+    m_active_seg_confs = get_segmentation_configs(m_seg_confs, {m_drmgr_ptr->config.segment_color});
+    m_prev_color_id = m_drmgr_ptr->config.segment_color;
     m_is_initialized = true;
 
     /* timers  //{ */
@@ -462,6 +472,62 @@ namespace object_detect
   }
 
   //}
+
+  bool ObjectDetector::color_change_callback(object_detect::ColorChange::Request& req, object_detect::ColorChange::Response& resp)
+  {
+    std::vector<std::string> known_colornames;
+    std::vector<SegConf> seg_confs;
+    std::vector<std::string> unknown_colornames;
+    for (const auto& color_name : req.detectColors)
+    {
+      std::string lowercase;
+      std::transform(color_name.begin(), color_name.end(), lowercase.begin(), ::tolower);
+      std::vector<SegConf> cur_seg_confs;
+      for (const auto& seg_conf : m_seg_confs)
+      {
+        if (seg_conf.color_name == lowercase)
+          cur_seg_confs.push_back(seg_conf);
+      }
+      if (cur_seg_confs.empty())
+      {
+        unknown_colornames.push_back(lowercase);
+      } else
+      {
+        known_colornames.push_back(lowercase);
+        seg_confs.insert(std::end(seg_confs), std::begin(cur_seg_confs), std::end(cur_seg_confs));
+      }
+    }
+    if (unknown_colornames.empty())
+    {
+      m_active_seg_confs = seg_confs;
+      std::stringstream ss;
+      ss << "Detecting colors: [";
+      for (size_t it = 0; it < known_colornames.size(); it++)
+      {
+        ss << known_colornames.at(it);
+        if (it < known_colornames.size()-1)
+          ss << ", ";
+      }
+      ss << "]";
+      resp.response = ss.str();
+      NODELET_INFO("[%s]: %s", m_node_name.c_str(), resp.response.c_str());
+      return true;
+    } else
+    {
+      std::stringstream ss;
+      ss << "Unknown colors: [";
+      for (size_t it = 0; it < unknown_colornames.size(); it++)
+      {
+        ss << unknown_colornames.at(it);
+        if (it < unknown_colornames.size()-1)
+          ss << ", ";
+      }
+      ss << "]";
+      resp.response = ss.str();
+      NODELET_WARN("[%s]: %s", m_node_name.c_str(), resp.response.c_str());
+      return false;
+    }
+  }
 
 }
 

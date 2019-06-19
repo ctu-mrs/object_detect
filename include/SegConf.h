@@ -15,8 +15,8 @@ struct SegConf
   bool active;
 
   int color;   // id of the color, segmented using this config
+  std::string color_name;
   int method;  // id of the segmentation method used
-  lut_t lut;
 
   // HSV thresholding parameters
   double hue_center;

@@ -38,6 +38,18 @@ generate_dynamic_reconfigure_options(
   config/DetectionParams.cfg
 )
 
+#Generate services in the 'srv' folder
+add_service_files(
+   FILES
+   ColorChange.srv
+ )
+
+## Generate added messages and services with any dependencies listed here
+ generate_messages(
+   DEPENDENCIES
+   std_msgs
+ )
+
 catkin_package(
   CATKIN_DEPENDS message_runtime image_transport # roscpp rospy std_msgs
 )
