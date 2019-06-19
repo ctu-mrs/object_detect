@@ -301,9 +301,9 @@ namespace object_detect
   /* highlight_mask() method //{ */
   void ObjectDetector::highlight_mask(cv::Mat& img, cv::Mat label_img)
   {
-    assert(img.size() == mask.size());
+    assert(img.size() == label_img.size());
     assert(img.channels() == 3);
-    assert(mask.channels() == 1);
+    assert(label_img.channels() == 1);
     Size size = img.size();
     if (img.isContinuous() && label_img.isContinuous())
     {
@@ -338,7 +338,8 @@ namespace object_detect
   
     ret.active = true;
     ret.color = color_id(cfg_name);
-    std::transform(cfg_name.begin(), cfg_name.end(), ret.color_name.begin(), ::tolower);
+    ret.color_name = cfg_name;
+    std::transform(ret.color_name.begin(), ret.color_name.end(), ret.color_name.begin(), ::tolower);
   
     std::string bin_method;
     pl.load_param(cfg_name + "/binarization_method", bin_method);
@@ -480,8 +481,8 @@ namespace object_detect
     std::vector<std::string> unknown_colornames;
     for (const auto& color_name : req.detectColors)
     {
-      std::string lowercase;
-      std::transform(color_name.begin(), color_name.end(), lowercase.begin(), ::tolower);
+      std::string lowercase = color_name;
+      std::transform(lowercase.begin(), lowercase.end(), lowercase.begin(), ::tolower);
       std::vector<SegConf> cur_seg_confs;
       for (const auto& seg_conf : m_seg_confs)
       {
@@ -497,6 +498,7 @@ namespace object_detect
         seg_confs.insert(std::end(seg_confs), std::begin(cur_seg_confs), std::end(cur_seg_confs));
       }
     }
+
     if (unknown_colornames.empty())
     {
       m_active_seg_confs = seg_confs;
