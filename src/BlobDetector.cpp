@@ -171,10 +171,24 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
   std::vector<Blob> blobs;
   preprocess_image(in_img);
   const cv::Mat labels_img = cv::Mat(in_img.size(), CV_8UC1, cv::Scalar(0));
+
   cv::Mat hsv_img;
-  cv::cvtColor(in_img, hsv_img, cv::COLOR_BGR2HSV);
+  {
+    bool use_hsv = false;
+    for (const auto& seg_conf : seg_confs)
+      use_hsv = use_hsv || seg_conf.method == bin_method_t::hsv;
+    if (use_hsv)
+      cv::cvtColor(in_img, hsv_img, cv::COLOR_BGR2HSV);
+  }
+
   cv::Mat lab_img;
-  cv::cvtColor(in_img, lab_img, cv::COLOR_BGR2Lab);
+  {
+    bool use_lab = false;
+    for (const auto& seg_conf : seg_confs)
+      use_lab = use_lab || seg_conf.method == bin_method_t::lab;
+    if (use_lab)
+    cv::cvtColor(in_img, lab_img, cv::COLOR_BGR2Lab);
+  }
 
   for (const auto& seg_conf : seg_confs)
   {
@@ -183,8 +197,11 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
       continue;
     const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
-    const cv::Mat tmp_img = binary_img/255*seg_conf.color;
-    cv::bitwise_or(labels_img, tmp_img, labels_img);
+    if (label_img.needed())
+    {
+      const cv::Mat tmp_img = binary_img/255*seg_conf.color;
+      cv::bitwise_or(labels_img, tmp_img, labels_img);
+    }
   }
   if (label_img.needed())
     labels_img.copyTo(label_img);
@@ -396,35 +413,6 @@ cv::Mat BlobDetector::threshold_lab(cv::Mat lab_img, const SegConf& seg_conf) co
 }
 //}
 
-/* class parallelSegment //{ */
-
-class parallelSegment : public ParallelLoopBody
-{
-public:
-    parallelSegment(const uint8_t* sptr, uint8_t* dptr, const lut_t& lut)
-      : sptr(sptr), dptr(dptr), lut(lut)
-    {
-    }
-
-    void operator()(const Range &range) const CV_OVERRIDE
-    {
-      for (int j = range.start; j < range.end; j++)
-      {
-        const uint8_t cur_b = sptr[3 * j + 0];
-        const uint8_t cur_g = sptr[3 * j + 1];
-        const uint8_t cur_r = sptr[3 * j + 2];
-        dptr[j] = lookup_lut(lut, cur_r, cur_g, cur_b);
-      }
-    }
-
-private:
-    const uint8_t* sptr;
-    uint8_t* dptr;
-    const lut_t& lut;
-};
-
-//}
-
 /* BlobDetector::segment_image() method //{ */
 cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut) const
 {
@@ -443,9 +431,28 @@ cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut) const
   {
     // when the arrays are continuous,
     // the outer loop is executed only once
-    const uint8_t* sptr = in_img.ptr<uint8_t>(i);
+    const uint8_t* const sptr_row = in_img.ptr<uint8_t>(i);
     uint8_t* dptr = binary_img.ptr<uint8_t>(i);
-    parallel_for_(Range(0, size.width), parallelSegment(sptr, dptr, lut));
+    parallel_for_(Range(0, size.width), [&](const Range &range)
+      {
+        const uint8_t * sptr = sptr_row + 3*range.start;
+        for (int j = range.start; j < range.end; j++)
+        {
+          const uint8_t cur_b = sptr[0];
+          const uint8_t cur_g = sptr[1];
+          const uint8_t cur_r = sptr[2];
+          dptr[j] = lookup_lut(lut, cur_r, cur_g, cur_b);
+          sptr += 3;
+        }
+      }
+    );
+    /* for (int j = 0; j < size.width; j++) */
+    /* { */
+    /*   const uint8_t cur_b = sptr[3 * j + 0]; */
+    /*   const uint8_t cur_g = sptr[3 * j + 1]; */
+    /*   const uint8_t cur_r = sptr[3 * j + 2]; */
+    /*   dptr[j] = lookup_lut(lut, cur_r, cur_g, cur_b); */
+    /* } */
   }
   return binary_img;
 }

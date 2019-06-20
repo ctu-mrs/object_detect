@@ -137,6 +137,7 @@ namespace object_detect
 
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
+      SegConf load_segmentation_config(const drcfg_t& cfg);
       SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
       std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
       void highlight_mask(cv::Mat& img, cv::Mat label_img);
@@ -201,6 +202,8 @@ namespace object_detect
       // --------------------------------------------------------------
 
       //{
+      //
+      void update_drcfg(const SegConf& seg_conf);
       // Checks whether a calculated distance is valid
       bool distance_valid(float distance);
       // Estimates distance of an object based on the 3D vectors pointing to its edges and known distance between those edges

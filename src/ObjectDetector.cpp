@@ -59,7 +59,16 @@ namespace object_detect
       for (const auto& seg_conf : m_active_seg_confs)
         NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
       BlobDetector blob_det(m_drmgr_ptr->config);
-      const vector<Blob> blobs = blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
+      vector<Blob> blobs;
+      if (m_drmgr_ptr->config.override_settings)
+      {
+        if (!m_active_seg_confs.empty())
+          m_active_seg_confs.at(0) = load_segmentation_config(m_drmgr_ptr->config);
+        blobs = blob_det.detect(rgb_img, m_active_seg_confs, label_img);
+      } else
+      {
+        blobs = blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
+      }
       if (publish_debug)
         highlight_mask(dbg_img, label_img);
       //}
@@ -334,6 +343,36 @@ namespace object_detect
   //}
 
   /* load_segmentation_config() method //{ */
+  SegConf ObjectDetector::load_segmentation_config(const drcfg_t& cfg)
+  {
+    SegConf ret;
+  
+    ret.active = true;
+    ret.color = color_id_t(cfg.segment_color);
+    ret.color_name = color_name(ret.color);
+    ret.method = bin_method_t(cfg.binarization_method);
+  
+    // Load HSV thresholding params
+    ret.hue_center = cfg.hue_center;
+    ret.hue_range = cfg.hue_range;
+    ret.sat_center = cfg.sat_center;
+    ret.sat_range = cfg.sat_range;
+    ret.val_center = cfg.val_center;
+    ret.val_range = cfg.val_range;
+  
+    // Load L*a*b* thresholding params
+    ret.l_center = cfg.l_center;
+    ret.l_range = cfg.l_range;
+    ret.a_center = cfg.a_center;
+    ret.a_range = cfg.a_range;
+    ret.b_center = cfg.b_center;
+    ret.b_range = cfg.b_range;
+  
+    return ret;
+  }
+  //}
+
+  /* load_segmentation_config() method //{ */
   SegConf ObjectDetector::load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name)
   {
     SegConf ret;
@@ -364,6 +403,34 @@ namespace object_detect
     pl.load_param(cfg_name + "/lab/b_range", ret.b_range);
   
     return ret;
+  }
+  //}
+
+  /* update_drcfg() method //{ */
+  void ObjectDetector::update_drcfg(const SegConf& seg_conf)
+  {
+    drcfg_t cfg = m_drmgr_ptr->config;
+  
+    cfg.segment_color = seg_conf.color;
+    cfg.binarization_method = seg_conf.method;
+  
+    // Load HSV thresholding params
+    cfg.hue_center = seg_conf.hue_center;
+    cfg.hue_range = seg_conf.hue_range;
+    cfg.sat_center = seg_conf.sat_center;
+    cfg.sat_range = seg_conf.sat_range;
+    cfg.val_center = seg_conf.val_center;
+    cfg.val_range = seg_conf.val_range;
+  
+    // Load L*a*b* thresholding params
+    cfg.l_center = seg_conf.l_center;
+    cfg.l_range = seg_conf.l_range;
+    cfg.a_center = seg_conf.a_center;
+    cfg.a_range = seg_conf.a_range;
+    cfg.b_center = seg_conf.b_center;
+    cfg.b_range = seg_conf.b_range;
+  
+    m_drmgr_ptr->update_config(cfg);
   }
   //}
 
@@ -461,9 +528,14 @@ namespace object_detect
 
     m_active_seg_confs = get_segmentation_configs(m_seg_confs, {m_drmgr_ptr->config.segment_color});
     m_prev_color_id = m_drmgr_ptr->config.segment_color;
-    ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
-    generate_lut(m_cur_lut, m_seg_confs);
-    ROS_INFO("[%s]: Lookup table generated", m_node_name.c_str());
+    {
+      const auto lut_start_time = ros::WallTime::now();
+      ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
+      generate_lut(m_cur_lut, m_seg_confs);
+      const auto lut_end_time = ros::WallTime::now();
+      const auto lut_dur = lut_end_time - lut_start_time;
+      ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
+    }
     m_is_initialized = true;
 
     /* timers  //{ */

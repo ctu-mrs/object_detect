@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(object_detect)
+set( CMAKE_VERBOSE_MAKEFILE on )
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -67,8 +68,10 @@ include_directories(include
   ${Eigen_INCLUDE_DIRS}
 )
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -fopenmp")
-set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3 -fopenmp")
+set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -fopenmp -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3 -fopenmp -DNDEBUG")
+# set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -O0")
+# set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -g -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -g -O0")
 
 # add_executable(display_tracking src/display_tracking.cpp)
