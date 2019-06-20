@@ -1,3 +1,4 @@
 string[] detectColors
 ---
-string response
+bool success
+string message

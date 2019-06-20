@@ -588,9 +588,9 @@ namespace object_detect
           ss << ", ";
       }
       ss << "]";
-      resp.response = ss.str();
-      NODELET_INFO("[%s]: %s", m_node_name.c_str(), resp.response.c_str());
-      return true;
+      resp.message = ss.str();
+      resp.success = true;
+      NODELET_INFO("[%s]: %s", m_node_name.c_str(), resp.message.c_str());
     } else
     {
       std::stringstream ss;
@@ -602,10 +602,11 @@ namespace object_detect
           ss << ", ";
       }
       ss << "]";
-      resp.response = ss.str();
-      NODELET_WARN("[%s]: %s", m_node_name.c_str(), resp.response.c_str());
-      return false;
+      resp.message = ss.str();
+      resp.success = false;
+      NODELET_WARN("[%s]: %s", m_node_name.c_str(), resp.message.c_str());
     }
+    return true;
   }
   
   //}
