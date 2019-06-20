@@ -320,7 +320,7 @@ namespace object_detect
       {
         if (sptr[j])
         {
-          const cv::Scalar color = color_highlight(sptr[j]);
+          const cv::Scalar color = color_highlight(color_id_t(sptr[j]));
           uint8_t& b = dptr[3*j + 0];
           uint8_t& g = dptr[3*j + 1];
           uint8_t& r = dptr[3*j + 2];

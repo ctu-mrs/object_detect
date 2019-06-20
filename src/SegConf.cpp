@@ -1,5 +1,7 @@
 #include "SegConf.h"
 
+using namespace object_detect;
+
 /* add_lut_hsv() //{ */
 
 void add_lut_hsv(lut_t& ret, const SegConf& seg_conf)
@@ -121,11 +123,14 @@ void generate_lut(lut_t& ret, const std::vector<SegConf>& seg_confs)
   {
     switch (seg_conf.method)
     {
-      case 0:
+      case bin_method_t::hsv:
         add_lut_hsv(ret, seg_conf);
         break;
-      case 1:
+      case bin_method_t::lab:
         add_lut_lab(ret, seg_conf);
+        break;
+      case bin_method_t::unknown_method:
+        std::cerr << "[generate_lut]: Unknown binarization method selected - cannot generate lookup table!";
         break;
     }
   }

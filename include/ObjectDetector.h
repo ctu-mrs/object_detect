@@ -62,31 +62,31 @@ namespace object_detect
   typedef mrs_lib::DynamicReconfigureMgr<object_detect::DetectionParamsConfig> drmgr_t;
 
   // THESE MUST CORRESPOND TO THE VALUES, SPECIFIED IN THE DYNAMIC RECONFIGURE SCRIPT (DetectionParams.cfg)!
-  static std::map<std::string, std::pair<int, cv::Scalar>> colors =
+  static std::map<std::string, std::pair<color_id_t, cv::Scalar>> colors =
     {
-      {"red",    {( 0x01 << 0 ), cv::Scalar(0, 0, 128)}},
-      {"green",  {( 0x01 << 1 ), cv::Scalar(0, 128, 0)}},
-      {"blue",   {( 0x01 << 2 ), cv::Scalar(128, 0, 0)}},
-      {"yellow", {( 0x01 << 3 ), cv::Scalar(0, 128, 128)}},
-      {"orange", {( 0x01 << 4 ), cv::Scalar(0, 88, 168)}},
+      {"red",    {color_id_t::red, cv::Scalar(0, 0, 128)}},
+      {"green",  {color_id_t::green, cv::Scalar(0, 128, 0)}},
+      {"blue",   {color_id_t::blue, cv::Scalar(128, 0, 0)}},
+      {"yellow", {color_id_t::yellow, cv::Scalar(0, 128, 128)}},
+      {"orange", {color_id_t::orange, cv::Scalar(0, 88, 168)}},
     };
-  static std::map<std::string, int> binname2id =
+  static std::map<std::string, bin_method_t> binname2id =
     {
-      {"hsv", 0},
-      {"lab", 1},
+      {"hsv", bin_method_t::hsv},
+      {"lab", bin_method_t::lab},
     };
 
   /* binarization_method_id() and color_id() helper functions //{ */
-  int color_id(std::string name)
+  color_id_t color_id(std::string name)
   {
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);
     if (colors.find(name) == std::end(colors))
-      return -1;
+      return color_id_t::unknown_color;
     else
       return colors.at(name).first;
   }
 
-  cv::Scalar color_highlight(int id)
+  cv::Scalar color_highlight(color_id_t id)
   {
     for (const auto& keyval : colors)
     {
@@ -96,7 +96,7 @@ namespace object_detect
     return cv::Scalar(0, 0, 128);
   }
 
-  std::string color_name(int id)
+  std::string color_name(color_id_t id)
   {
     for (const auto& keyval : colors)
     {
@@ -106,11 +106,11 @@ namespace object_detect
     return "unknown";
   }
 
-  int binarization_method_id(std::string name)
+  bin_method_t binarization_method_id(std::string name)
   {
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);
     if (binname2id.find(name) == std::end(binname2id))
-      return -1;
+      return bin_method_t::unknown_method;
     else
       return binname2id.at(name);
   }
