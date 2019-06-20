@@ -33,6 +33,7 @@ namespace object_detect
 
   struct Params
   {
+    int blob_radius_method;
     // Filter by area
     bool filter_by_area;
     int min_area;

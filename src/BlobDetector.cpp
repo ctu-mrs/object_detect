@@ -103,16 +103,32 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
     }
 
     // compute blob radius
+    switch (m_params.blob_radius_method)
     {
-      double max_dist = 0.0;
-      for (size_t pointIdx = 0; pointIdx < contours[contourIdx].size(); pointIdx++)
-      {
-        const Point2d pt = contours[contourIdx][pointIdx];
-        const double cur_dist = norm(blob.location - pt);
-        if (cur_dist > max_dist)
-          max_dist = cur_dist;
-      }
-      blob.radius = max_dist;
+      case 0:
+        {
+          double max_dist = 0.0;
+          for (size_t pointIdx = 0; pointIdx < contours[contourIdx].size(); pointIdx++)
+          {
+            const Point2d pt = contours[contourIdx][pointIdx];
+            const double cur_dist = norm(blob.location - pt);
+            if (cur_dist > max_dist)
+              max_dist = cur_dist;
+          }
+          blob.radius = max_dist;
+          break;
+        }
+      case 1:
+        {
+          std::vector<double> dists;
+          for (size_t pointIdx = 0; pointIdx < contours[contourIdx].size(); pointIdx++)
+          {
+            Point2d pt = contours[contourIdx][pointIdx];
+            dists.push_back(norm(blob.location - pt));
+          }
+          std::sort(dists.begin(), dists.end());
+          blob.radius = (dists[(dists.size() - 1) / 2] + dists[dists.size() / 2]) / 2.;
+        }
     }
 
     blob.color = color_label;
@@ -461,6 +477,7 @@ cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut) const
 /* Params constructor //{ */
 Params::Params(drcfg_t cfg)
 {
+  blob_radius_method = cfg.blob_radius_method;
   // Filter by area
   filter_by_area = cfg.filter_by_area;
   min_area = cfg.min_area;
