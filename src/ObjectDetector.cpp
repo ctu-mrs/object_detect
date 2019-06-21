@@ -87,10 +87,6 @@ namespace object_detect
         const cv::Point& center = blob.location;
         const float radius = blob.radius;
 
-        if (publish_debug)
-          /* cv::circle(dbg_img, center, radius, color_highlight(2*blob.color), 2); */
-          cv::circle(dbg_img, center, radius, cv::Scalar(0, 0, 255), 2);
-
         /* Calculate 3D vector pointing to left and right edges of the detected object //{ */
         const Eigen::Vector3f l_vec = project(center.x - radius*cos(M_PI_4), center.y - radius*sin(M_PI_4), m_rgb_camera_model);
         const Eigen::Vector3f r_vec = project(center.x + radius*cos(M_PI_4), center.y + radius*sin(M_PI_4), m_rgb_camera_model);
@@ -138,6 +134,13 @@ namespace object_detect
           resulting_distance_quality  = 1;
         }
         //}
+
+        if (publish_debug)
+        {
+          /* cv::circle(dbg_img, center, radius, color_highlight(2*blob.color), 2); */
+          cv::circle(dbg_img, center, radius, cv::Scalar(0, 0, 255), 2);
+          cv::putText(dbg_img, std::to_string(resulting_distance_quality), center+cv::Point(radius, radius), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
+        }
 
         cout << "Estimated distance used: " << m_object_radius_known
              << ", valid: " << estimated_distance_valid
