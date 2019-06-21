@@ -439,7 +439,7 @@ class parallelSegment : public ParallelLoopBody
       {
       }
 
-      void operator()(const Range &range) const CV_OVERRIDE
+      void operator()(const Range &range) const
       {
         for (int j = range.start; j < range.end; j++)
         {

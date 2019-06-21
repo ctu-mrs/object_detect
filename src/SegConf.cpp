@@ -22,7 +22,7 @@ namespace object_detect
         {
         }
 
-        void operator()(const cv::Range &range) const CV_OVERRIDE
+        void operator()(const cv::Range &range) const
         {
           cv::Mat color_rgb;
           cv::Mat color_hsv;
@@ -117,7 +117,7 @@ namespace object_detect
         {
         }
 
-        void operator()(const cv::Range &range) const CV_OVERRIDE
+        void operator()(const cv::Range &range) const
         {
           cv::Mat color_rgb;
           cv::Mat color_lab;
