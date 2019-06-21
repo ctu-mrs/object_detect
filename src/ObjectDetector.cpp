@@ -50,24 +50,27 @@ namespace object_detect
       }
       //}
 
-      /* Detect blobs of required color in the RGB image //{ */
-      if (m_prev_color_id != m_drmgr_ptr->config.segment_color)
+      std::vector<Blob> blobs;
       {
-        m_active_seg_confs = get_segmentation_configs(m_seg_confs, {m_drmgr_ptr->config.segment_color});
-        m_prev_color_id = m_drmgr_ptr->config.segment_color;
-      }
-      for (const auto& seg_conf : m_active_seg_confs)
-        NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
-      BlobDetector blob_det(m_drmgr_ptr->config);
-      vector<Blob> blobs;
-      if (m_drmgr_ptr->config.override_settings)
-      {
-        if (!m_active_seg_confs.empty())
-          m_active_seg_confs.at(0) = load_segmentation_config(m_drmgr_ptr->config);
-        blobs = blob_det.detect(rgb_img, m_active_seg_confs, label_img);
-      } else
-      {
-        blobs = blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
+        std::scoped_lock<std::mutex> lck(m_active_seg_confs_mtx);
+        /* Detect blobs of required color in the RGB image //{ */
+        if (m_prev_color_id != m_drmgr_ptr->config.segment_color)
+        {
+          m_active_seg_confs = get_segmentation_configs(m_seg_confs, {m_drmgr_ptr->config.segment_color});
+          m_prev_color_id = m_drmgr_ptr->config.segment_color;
+        }
+        for (const auto& seg_conf : m_active_seg_confs)
+          NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
+        BlobDetector blob_det(m_drmgr_ptr->config);
+        if (m_drmgr_ptr->config.override_settings)
+        {
+          if (!m_active_seg_confs.empty())
+            m_active_seg_confs.at(0) = load_segmentation_config(m_drmgr_ptr->config);
+          blobs = blob_det.detect(rgb_img, m_active_seg_confs, label_img);
+        } else
+        {
+          blobs = blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
+        }
       }
       if (publish_debug)
         highlight_mask(dbg_img, label_img);
@@ -206,6 +209,22 @@ namespace object_detect
       ROS_INFO("[%s]: Image processed", m_node_name.c_str());
     }
     
+  }
+  //}
+
+  /* drmgr_update_loop() method //{ */
+  void ObjectDetector::drcfg_update_loop([[maybe_unused]] const ros::TimerEvent& evt)
+  {
+    if (!m_drmgr_ptr->config.override_settings)
+    {
+      std::vector<SegConf> active_seg_confs;
+      {
+        std::scoped_lock<std::mutex> lck(m_active_seg_confs_mtx);
+        active_seg_confs = m_active_seg_confs;
+      }
+      if (!active_seg_confs.empty())
+        update_drcfg(active_seg_confs.at(0));
+    }
   }
   //}
 
@@ -544,6 +563,7 @@ namespace object_detect
     /* timers  //{ */
 
     m_main_loop_timer = nh.createTimer(ros::Rate(loop_rate), &ObjectDetector::main_loop, this);
+    m_drcfg_update_loop_timer = nh.createTimer(ros::Rate(2.0), &ObjectDetector::drcfg_update_loop, this);
 
     //}
 

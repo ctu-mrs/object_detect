@@ -137,6 +137,7 @@ namespace object_detect
 
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
+      void drcfg_update_loop([[maybe_unused]] const ros::TimerEvent& evt);
       SegConf load_segmentation_config(const drcfg_t& cfg);
       SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
       std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
@@ -160,6 +161,7 @@ namespace object_detect
       double m_max_depth;
       std::vector<SegConf> m_seg_confs;
       std::vector<SegConf> m_active_seg_confs;
+      std::mutex m_active_seg_confs_mtx;
       //}
 
       /* ROS related variables (subscribers, timers etc.) //{ */
@@ -179,6 +181,7 @@ namespace object_detect
       ros::ServiceServer m_color_query_server;
 
       ros::Timer m_main_loop_timer;
+      ros::Timer m_drcfg_update_loop_timer;
       //}
 
     private:
