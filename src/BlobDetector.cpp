@@ -429,6 +429,35 @@ cv::Mat BlobDetector::threshold_lab(cv::Mat lab_img, const SegConf& seg_conf) co
 }
 //}
 
+/* class parallelSegment //{ */
+
+class parallelSegment : public ParallelLoopBody
+{
+  public:
+      parallelSegment(const uint8_t* sptr, uint8_t* dptr, const lut_t& lut)
+        : sptr(sptr), dptr(dptr), lut(lut)
+      {
+      }
+
+      void operator()(const Range &range) const CV_OVERRIDE
+      {
+        for (int j = range.start; j < range.end; j++)
+        {
+          const uint8_t cur_b = sptr[3 * j + 0];
+          const uint8_t cur_g = sptr[3 * j + 1];
+          const uint8_t cur_r = sptr[3 * j + 2];
+          dptr[j] = lookup_lut(lut, cur_r, cur_g, cur_b);
+        }
+      }
+
+  private:
+      const uint8_t* sptr;
+      uint8_t* dptr;
+      const lut_t& lut;
+};
+
+//}
+
 /* BlobDetector::segment_image() method //{ */
 cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut) const
 {
@@ -449,19 +478,7 @@ cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut) const
     // the outer loop is executed only once
     const uint8_t* const sptr_row = in_img.ptr<uint8_t>(i);
     uint8_t* dptr = binary_img.ptr<uint8_t>(i);
-    parallel_for_(Range(0, size.width), [&](const Range &range)
-      {
-        const uint8_t * sptr = sptr_row + 3*range.start;
-        for (int j = range.start; j < range.end; j++)
-        {
-          const uint8_t cur_b = sptr[0];
-          const uint8_t cur_g = sptr[1];
-          const uint8_t cur_r = sptr[2];
-          dptr[j] = lookup_lut(lut, cur_r, cur_g, cur_b);
-          sptr += 3;
-        }
-      }
-    );
+    parallel_for_(Range(0, size.width), parallelSegment(sptr_row, dptr, lut));
     /* for (int j = 0; j < size.width; j++) */
     /* { */
     /*   const uint8_t cur_b = sptr[3 * j + 0]; */
