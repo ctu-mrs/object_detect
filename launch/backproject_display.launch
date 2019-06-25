@@ -1,0 +1,36 @@
+<launch>
+
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+
+  <arg name="debug" default="false" />
+  <arg unless="$(arg debug)" name="launch_prefix_debug" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix_debug" value="debug_roslaunch"/>
+  <arg name="profile" default="false" />
+  <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
+  <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
+
+  <arg name="color_image" value="rs_d435/color/image_rect_color"/>
+  <arg name="color_cinfo" value="rs_d435/color/camera_info"/>
+
+  <group ns="$(arg uav_name)">
+
+    <node pkg="object_detect" type="backproject_display" name="backproject_display" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile)" >
+      
+      <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
+      <param name="uav_name" value="$(arg uav_name)" />
+
+      <param name="colors" command="bash $(find object_detect)/scripts/load_colors.sh '$(find object_detect)/config/colors' '/$(arg uav_name)/object_detect'" />
+      <!-- <rosparam file="$(find object_detect)/config/colors/Red.yaml" /> -->
+      <!-- <rosparam file="$(find object_detect)/config/colors/Green.yaml" /> -->
+      <!-- <rosparam file="$(find object_detect)/config/colors/Blue.yaml" /> -->
+      <!-- <rosparam file="$(find object_detect)/config/colors/Yellow.yaml" /> -->
+      <remap from="~chosen_balloon" to="balloon_planner/balloon_chosen_out" />
+      <remap from="~detections" to="object_detect/detected_objects" />
+      <remap from="~image_rect" to="$(arg color_image)" />
+      <remap from="~camera_info" to="$(arg color_cinfo)" />
+
+    </node>
+  
+  </group>
+
+</launch>

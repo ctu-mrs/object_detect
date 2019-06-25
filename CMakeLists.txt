@@ -68,10 +68,10 @@ include_directories(include
   ${Eigen_INCLUDE_DIRS}
 )
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -fopenmp -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3 -fopenmp -DNDEBUG")
-# set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -O0")
-# set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -g -O0")
+# set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -fopenmp -DNDEBUG")
+# set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3 -fopenmp -DNDEBUG")
+set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -O0")
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -g -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -g -O0")
 
 # add_executable(display_tracking src/display_tracking.cpp)
@@ -100,6 +100,16 @@ add_dependencies(ObjectDetector
   ${catkin_EXPORTED_TARGETS}
 )
 target_link_libraries(ObjectDetector
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+add_executable(backproject_display src/backproject_display.cpp)
+add_dependencies(backproject_display
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+)
+target_link_libraries(backproject_display
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )

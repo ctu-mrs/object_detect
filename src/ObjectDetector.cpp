@@ -143,6 +143,8 @@ namespace object_detect
           /* cv::circle(dbg_img, center, radius, color_highlight(2*blob.color), 2); */
           cv::circle(dbg_img, center, radius, cv::Scalar(0, 0, 255), 2);
           cv::putText(dbg_img, std::to_string(resulting_distance_quality), center+cv::Point(radius, radius), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", center+cv::Point(radius, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", center+cv::Point(radius, -radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
         }
 
         cout << "Estimated distance used: " << m_object_radius_known
