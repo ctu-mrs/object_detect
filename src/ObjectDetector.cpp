@@ -491,6 +491,10 @@ namespace object_detect
     /** Load parameters from ROS * //{*/
     string node_name = ros::this_node::getName().c_str();
     ParamLoader pl(nh, m_node_name);
+
+    // LOAD DYNAMIC PARAMETERS
+    m_drmgr_ptr = std::make_unique<drmgr_t>(nh, m_node_name);
+
     // LOAD STATIC PARAMETERS
     ROS_INFO("Loading static parameters:");
     // Load the detection parameters
@@ -504,9 +508,11 @@ namespace object_detect
     std::string colors_str;
     pl.load_param("colors", colors_str);
     m_seg_confs = load_color_configs(pl, colors_str);
-
-    // LOAD DYNAMIC PARAMETERS
-    m_drmgr_ptr = std::make_unique<drmgr_t>(nh, m_node_name);
+    // load the desired segmentation color as text and convert to ID
+    std::string segment_color_text = pl.load_param2<std::string>("segment_color_text");
+    drcfg_t drcfg = m_drmgr_ptr->config;
+    drcfg.segment_color = color_id(segment_color_text);
+    m_drmgr_ptr->update_config(drcfg);
 
     if (!m_drmgr_ptr->loaded_successfully())
     {
