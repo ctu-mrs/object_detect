@@ -64,10 +64,11 @@ namespace object_detect
 
   enum dist_qual_t
   {
+    unknown_qual = -1,
     no_estimate = 0,
     blob_size = 1,
     depthmap = 2,
-    both = 3
+    both = 3,
   };
 
   // THESE MUST CORRESPOND TO THE VALUES, SPECIFIED IN THE DYNAMIC RECONFIGURE SCRIPT (DetectionParams.cfg)!
@@ -84,6 +85,13 @@ namespace object_detect
       {"hsv", bin_method_t::hsv},
       {"lab", bin_method_t::lab},
     };
+  static std::map<std::string, dist_qual_t> dist_qual2id =
+  {
+    {"no_estimate", dist_qual_t::no_estimate},
+    {"blob_size", dist_qual_t::blob_size},
+    {"depthmap", dist_qual_t::depthmap},
+    {"both", dist_qual_t::both},
+  };
 
   /* binarization_method_id() and color_id() helper functions //{ */
   color_id_t color_id(std::string name)
@@ -123,6 +131,25 @@ namespace object_detect
     else
       return binname2id.at(name);
   }
+
+  dist_qual_t dist_qual_id(std::string name)
+  {
+    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+    if (dist_qual2id.find(name) == std::end(dist_qual2id))
+      return dist_qual_t::unknown_qual;
+    else
+      return dist_qual2id.at(name);
+  }
+
+  std::string dist_qual_name(dist_qual_t id)
+  {
+    for (const auto& keyval : dist_qual2id)
+    {
+      if (keyval.second == id)
+        return keyval.first;
+    }
+    return "unknown";
+  }
   //}
 
   /* //{ class ObjectDetector */
@@ -132,14 +159,10 @@ namespace object_detect
 
     private:
 
-      /* pos_cov_t helper struct //{ */
-      struct pos_cov_t
-      {
-        Eigen::Vector3d position;
-        Eigen::Matrix3d covariance;
-      };
-      //}
-    
+      using ros_poses_t = object_detect::PoseWithCovarianceArrayStamped::_poses_type;
+      using ros_pose_t = ros_poses_t::value_type::_pose_type;
+      using ros_cov_t = ros_poses_t::value_type::_covariance_type;
+
     public:
       ObjectDetector() : m_node_name("ObjectDetector") {};
       virtual void onInit();
@@ -147,7 +170,10 @@ namespace object_detect
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
       void drcfg_update_loop([[maybe_unused]] const ros::TimerEvent& evt);
-      std::vector<geometry_msgs::PoseWithCovariance> generate_poses(const std::vector<geometry_msgs::Point32>& positions, const std::vector<dist_qual_t>& distance_qualities);
+      ros_poses_t generate_poses(const std::vector<geometry_msgs::Point32>& positions, const std::vector<dist_qual_t>& distance_qualities);
+      static ros_cov_t generate_covariance(const geometry_msgs::Point32& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
+      static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
+      static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);
       SegConf load_segmentation_config(const drcfg_t& cfg);
       SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
       std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
@@ -170,8 +196,9 @@ namespace object_detect
       double m_min_depth;
       double m_max_depth;
       std::vector<SegConf> m_seg_confs;
-      std::vector<SegConf> m_active_seg_confs;
       std::mutex m_active_seg_confs_mtx;
+      std::vector<SegConf> m_active_seg_confs;
+      std::map<dist_qual_t, std::pair<double, double>> m_cov_coeffs;
       //}
 
       /* ROS related variables (subscribers, timers etc.) //{ */

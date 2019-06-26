@@ -1,2 +1,2 @@
-std_msgs/Header                  header
-geometry_msgs/PoseWithCovariance poses
+std_msgs/Header                    header
+geometry_msgs/PoseWithCovariance[] poses

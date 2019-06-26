@@ -194,7 +194,7 @@ namespace object_detect
 
         sensor_msgs::ChannelFloat32 chl_msg;
         chl_msg.name = "distance_quality"s;
-        chl_msg.values = distance_qualities;
+        chl_msg.values = std::vector<float>(std::begin(distance_qualities), std::end(distance_qualities));
         pcl_msg.channels.push_back(chl_msg);
 
         m_pub_pcl.publish(pcl_msg);
@@ -243,14 +243,109 @@ namespace object_detect
   }
   //}
 
-  object_detect::PoseWithCovarianceArrayStamped::_poses_type ObjectDetector::generate_poses(const std::vector<geometry_msgs::Point32>& positions, const std::vector<dist_qual_t>& distance_qualities)
+  /* generate_poses() method //{ */
+  ObjectDetector::ros_poses_t ObjectDetector::generate_poses(const std::vector<geometry_msgs::Point32>& positions, const std::vector<dist_qual_t>& distance_qualities)
   {
     assert(positions.size() == distance_qualities.size());
-    std::vector<geometry_msgs::PoseWithCovariance> ret;
+    ros_poses_t ret;
     ret.reserve(positions.size());
-
-
+  
+    for (unsigned it = 0; it < positions.size(); it++)
+    {
+      const auto qual = distance_qualities.at(it);
+      const auto pos = positions.at(it);
+  
+      ros_pose_t pose;
+      pose.position.x = pos.x;
+      pose.position.y = pos.y;
+      pose.position.z = pos.z;
+      pose.orientation.x = 0;
+      pose.orientation.y = 0;
+      pose.orientation.z = 0;
+      pose.orientation.w = 1;
+  
+      if (m_cov_coeffs.find(qual) == std::end(m_cov_coeffs))
+      {
+        ROS_ERROR_THROTTLE(1.0, "[ObjectDetector]: Invalid distance estimate quality %d! Skipping detection.", qual);
+        continue;
+      }
+      auto [xy_covariance_coeff, z_covariance_coeff] = m_cov_coeffs.at(qual);
+      const ros_cov_t cov = generate_covariance(pos, xy_covariance_coeff, z_covariance_coeff);
+  
+      geometry_msgs::PoseWithCovariance pose_with_cov;
+      pose_with_cov.pose = pose;
+      pose_with_cov.covariance = cov;
+      ret.push_back(pose_with_cov);
+    }
+    return ret;
   }
+  //}
+
+  /* generate_covariance() method //{ */
+  ObjectDetector::ros_cov_t ObjectDetector::generate_covariance(const geometry_msgs::Point32& pos, const double xy_covariance_coeff, const double z_covariance_coeff)
+  {
+    Eigen::Vector3d e_pos(pos.x, pos.y, pos.z);
+    Eigen::Matrix3d e_cov = calc_position_covariance(e_pos, xy_covariance_coeff, z_covariance_coeff);
+    ros_cov_t cov;
+    for (int r = 0; r < 6; r++)
+    {
+      for (int c = 0; c < 6; c++)
+      {
+        if (r < 3 && c < 3)
+          cov[r * 6 + c] = e_cov(r, c);
+        else if (r == c)
+          cov[r * 6 + c] = 666;
+        else
+          cov[r * 6 + c] = 0.0;
+      }
+    }
+    return cov;
+  }
+  //}
+
+  /* calc_position_covariance() method //{ */
+  /* position_sf is position of the detection in 3D in the frame of the sensor (camera) */
+  Eigen::Matrix3d ObjectDetector::calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff)
+  {
+    /* Calculates the corresponding covariance matrix of the estimated 3D position */
+    Eigen::Matrix3d pos_cov = Eigen::Matrix3d::Identity();  // prepare the covariance matrix
+    const double tol = 1e-9;
+    pos_cov(0, 0) = pos_cov(1, 1) = xy_covariance_coeff;
+
+    pos_cov(2, 2) = position_sf(2) * sqrt(position_sf(2)) * z_covariance_coeff;
+    if (pos_cov(2, 2) < 0.33 * z_covariance_coeff)
+      pos_cov(2, 2) = 0.33 * z_covariance_coeff;
+
+    // Find the rotation matrix to rotate the covariance to point in the direction of the estimated position
+    const Eigen::Vector3d a(0.0, 0.0, 1.0);
+    const Eigen::Vector3d b = position_sf.normalized();
+    const Eigen::Vector3d v = a.cross(b);
+    const double sin_ab = v.norm();
+    const double cos_ab = a.dot(b);
+    Eigen::Matrix3d vec_rot = Eigen::Matrix3d::Identity();
+    if (sin_ab < tol)  // unprobable, but possible - then it is identity or 180deg
+    {
+      if (cos_ab + 1.0 < tol)  // that would be 180deg
+      {
+        vec_rot << -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0;
+      }     // otherwise its identity
+    } else  // otherwise just construct the matrix
+    {
+      Eigen::Matrix3d v_x;
+      v_x << 0.0, -v(2), v(1), v(2), 0.0, -v(0), -v(1), v(0), 0.0;
+      vec_rot = Eigen::Matrix3d::Identity() + v_x + (1 - cos_ab) / (sin_ab * sin_ab) * (v_x * v_x);
+    }
+    pos_cov = rotate_covariance(pos_cov, vec_rot);  // rotate the covariance to point in direction of est. position
+    return pos_cov;
+  }
+  //}
+
+  /* rotate_covariance() method //{ */
+  Eigen::Matrix3d ObjectDetector::rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation)
+  {
+    return rotation * covariance * rotation.transpose();  // rotate the covariance to point in direction of est. position
+  }
+  //}
 
   /* get_active_segmentation_configs() method //{ */
   std::vector<SegConf> ObjectDetector::get_segmentation_configs(const std::vector<SegConf>& all_seg_confs, std::vector<int> color_ids)
@@ -518,7 +613,7 @@ namespace object_detect
     m_drmgr_ptr = std::make_unique<drmgr_t>(nh, m_node_name);
 
     // LOAD STATIC PARAMETERS
-    ROS_INFO("Loading static parameters:");
+    ROS_INFO("[%s]: Loading static parameters:", m_node_name.c_str());
     // Load the detection parameters
     pl.load_param("object_radius", m_object_radius, -1.0);
     m_object_radius_known = m_object_radius > 0;
@@ -526,6 +621,55 @@ namespace object_detect
     pl.load_param("max_dist_diff", m_max_dist_diff);
     pl.load_param("min_depth", m_min_depth);
     pl.load_param("max_depth", m_max_depth);
+
+    /* load covariance coefficients //{ */
+    
+    // admittedly a pretty fcking overcomplicated way to do this, but I'm home bored, so whatever
+    {
+      std::map<std::string, double> cov_coeffs_xy = pl.load_param2<std::map<std::string, double>>("cov_coeffs/xy");
+      std::map<std::string, double> cov_coeffs_z = pl.load_param2<std::map<std::string, double>>("cov_coeffs/z");
+      std::map<dist_qual_t, double> loaded_vals_xy;
+      for (const auto& keyval : cov_coeffs_xy)
+      {
+        int val;
+        if ((val = dist_qual_id(keyval.first)) == dist_qual_t::unknown_qual)
+        {
+          ROS_ERROR("[%s]: Unknwown distance estimation quality key: '%s'! Skipping.", m_node_name.c_str(), keyval.first.c_str());
+          continue;
+        }
+        dist_qual_t enval = (dist_qual_t)val;
+        loaded_vals_xy.insert({enval, keyval.second});
+      }
+      std::map<dist_qual_t, int> loaded_vals_z;
+      for (const auto& keyval : cov_coeffs_z)
+      {
+        int val;
+        if ((val = dist_qual_id(keyval.first)) == dist_qual_t::unknown_qual)
+        {
+          ROS_ERROR("[%s]: Unknwown distance estimation quality key: '%s'! Skipping.", m_node_name.c_str(), keyval.first.c_str());
+          continue;
+        }
+        dist_qual_t enval = (dist_qual_t)val;
+        loaded_vals_z.insert({enval, keyval.second});
+      }
+      for (const auto& keyval : loaded_vals_xy)
+      {
+        auto it = std::end(loaded_vals_z);
+        if ((it = loaded_vals_z.find(keyval.first)) == std::end(loaded_vals_z))
+        {
+          ROS_ERROR("[%s]: Distance estimation quality key '%s' was specified for xy but not for z! Skipping.", m_node_name.c_str(), dist_qual_name(keyval.first).c_str());
+          continue;
+        }
+        m_cov_coeffs.insert({keyval.first, {keyval.second, it->second}});
+      }
+      for (const auto& keyval : loaded_vals_z)
+        if (loaded_vals_xy.find(keyval.first) == std::end(loaded_vals_xy))
+          ROS_ERROR("[%s]: Distance estimation quality key '%s' was specified for xy but not for z! Skipping.", m_node_name.c_str(), dist_qual_name(keyval.first).c_str());
+          // just warn the user, not much else we can do
+    }
+    
+    //}
+
     double loop_rate = pl.load_param2<double>("loop_rate", 100);
     std::string colors_str;
     pl.load_param("colors", colors_str);
@@ -538,13 +682,13 @@ namespace object_detect
 
     if (!m_drmgr_ptr->loaded_successfully())
     {
-      ROS_ERROR("Some default values of dynamically reconfigurable parameters were not loaded successfully, ending the node");
+      ROS_ERROR("[%s]: Some default values of dynamically reconfigurable parameters were not loaded successfully, ending the node", m_node_name.c_str());
       ros::shutdown();
     }
 
     if (!pl.loaded_successfully())
     {
-      ROS_ERROR("Some compulsory parameters were not loaded successfully, ending the node");
+      ROS_ERROR("[%s]: Some compulsory parameters were not loaded successfully, ending the node", m_node_name.c_str());
       ros::shutdown();
     }
     //}
