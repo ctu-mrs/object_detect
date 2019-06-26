@@ -79,7 +79,7 @@ namespace object_detect
       /* Calculate 3D positions of the detected blobs //{ */
       const size_t n_dets = blobs.size();
       vector<geometry_msgs::Point32> positions;
-      vector<float> distance_qualities;
+      vector<dist_qual_t> distance_qualities;
       positions.reserve(n_dets);
 
       for (size_t it = 0; it < n_dets; it++)
@@ -119,22 +119,22 @@ namespace object_detect
 
         /* Evaluate the resulting distance and its quality //{ */
         float resulting_distance = 0.0f;
-        int resulting_distance_quality = 0;
+        dist_qual_t resulting_distance_quality = dist_qual_t::no_estimate;
         if (estimated_distance_valid && depthmap_distance_valid)
         {
           if (abs(depthmap_distance - estimated_distance) < m_max_dist_diff)
           {
             resulting_distance = depthmap_distance; // assuming this is a more precise distance estimate
-            resulting_distance_quality  = 3;
+            resulting_distance_quality = dist_qual_t::both;
           }
         } else if (depthmap_distance_valid)
         {
           resulting_distance = depthmap_distance;
-          resulting_distance_quality  = 2;
+          resulting_distance_quality = dist_qual_t::depthmap;
         } else if (estimated_distance_valid)
         {
           resulting_distance = estimated_distance;
-          resulting_distance_quality  = 1;
+          resulting_distance_quality = dist_qual_t::blob_size;
         }
         //}
 
@@ -152,7 +152,7 @@ namespace object_detect
              << ", depthmap distance valid: " << depthmap_distance_valid
              << ", resulting quality: " << resulting_distance_quality << std::endl;
 
-        if (resulting_distance_quality > 0)
+        if (resulting_distance_quality > dist_qual_t::no_estimate)
         {
           /* Calculate the estimated position of the object //{ */
           const Eigen::Vector3f pos_vec = resulting_distance * (l_vec + r_vec) / 2.0;
@@ -174,6 +174,19 @@ namespace object_detect
       //}
 
       /* Publish all the calculated valid positions //{ */
+      if (m_pub_det.getNumSubscribers() > 0)
+      {
+        object_detect::PoseWithCovarianceArrayStamped det_msg;
+  
+        det_msg.header = rgb_img_msg->header;
+        det_msg.poses = generate_poses(positions, distance_qualities);
+
+        m_pub_det.publish(det_msg);
+      }
+      //}
+
+      /* Publish all the calculated valid positions //{ */
+      if (m_pub_pcl.getNumSubscribers() > 0)
       {
         sensor_msgs::PointCloud pcl_msg;
         pcl_msg.header = rgb_img_msg->header;
@@ -229,6 +242,15 @@ namespace object_detect
     }
   }
   //}
+
+  object_detect::PoseWithCovarianceArrayStamped::_poses_type ObjectDetector::generate_poses(const std::vector<geometry_msgs::Point32>& positions, const std::vector<dist_qual_t>& distance_qualities)
+  {
+    assert(positions.size() == distance_qualities.size());
+    std::vector<geometry_msgs::PoseWithCovariance> ret;
+    ret.reserve(positions.size());
+
+
+  }
 
   /* get_active_segmentation_configs() method //{ */
   std::vector<SegConf> ObjectDetector::get_segmentation_configs(const std::vector<SegConf>& all_seg_confs, std::vector<int> color_ids)
@@ -532,7 +554,8 @@ namespace object_detect
     m_sh_rgb_cinfo = smgr.create_handler_threadsafe<sensor_msgs::CameraInfo>("rgb_camera_info", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
   
     m_pub_debug = nh.advertise<sensor_msgs::Image&>("debug_image", 1);
-    m_pub_pcl = nh.advertise<sensor_msgs::PointCloud>("detected_objects", 10);
+    m_pub_pcl = nh.advertise<sensor_msgs::PointCloud>("detected_objects_pcl", 10);
+    m_pub_det = nh.advertise<object_detect::PoseWithCovarianceArrayStamped>("detected_objects", 10);
 
     if (!smgr.loaded_successfully())
     {

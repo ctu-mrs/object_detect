@@ -45,6 +45,7 @@
 #include <mrs_lib/Profiler.h>
 
 // Includes from this package
+#include <object_detect/PoseWithCovarianceArrayStamped.h>
 #include <object_detect/DetectionParamsConfig.h>
 #include <object_detect/ColorChange.h>
 #include <object_detect/ColorQuery.h>
@@ -60,6 +61,14 @@ namespace object_detect
 {
   // shortcut type to the dynamic reconfigure manager template instance
   typedef mrs_lib::DynamicReconfigureMgr<object_detect::DetectionParamsConfig> drmgr_t;
+
+  enum dist_qual_t
+  {
+    no_estimate = 0,
+    blob_size = 1,
+    depthmap = 2,
+    both = 3
+  };
 
   // THESE MUST CORRESPOND TO THE VALUES, SPECIFIED IN THE DYNAMIC RECONFIGURE SCRIPT (DetectionParams.cfg)!
   static std::map<std::string, std::pair<color_id_t, cv::Scalar>> colors =
@@ -138,6 +147,7 @@ namespace object_detect
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
       void drcfg_update_loop([[maybe_unused]] const ros::TimerEvent& evt);
+      std::vector<geometry_msgs::PoseWithCovariance> generate_poses(const std::vector<geometry_msgs::Point32>& positions, const std::vector<dist_qual_t>& distance_qualities);
       SegConf load_segmentation_config(const drcfg_t& cfg);
       SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
       std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
@@ -174,6 +184,7 @@ namespace object_detect
       mrs_lib::SubscribeHandlerPtr<sensor_msgs::ImageConstPtr> m_sh_rgb;
       mrs_lib::SubscribeHandlerPtr<sensor_msgs::CameraInfo> m_sh_rgb_cinfo;
 
+      ros::Publisher m_pub_det;
       ros::Publisher m_pub_pcl;
       ros::Publisher m_pub_debug;
 

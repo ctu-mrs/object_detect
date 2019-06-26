@@ -39,6 +39,12 @@ generate_dynamic_reconfigure_options(
   config/DetectionParams.cfg
 )
 
+#Generate messages in the 'msg' folder
+add_message_files(
+   FILES
+   PoseWithCovarianceArrayStamped.msg
+ )
+
 #Generate services in the 'srv' folder
 add_service_files(
    FILES
@@ -50,6 +56,7 @@ add_service_files(
  generate_messages(
    DEPENDENCIES
    std_msgs
+   geometry_msgs
  )
 
 catkin_package(
