@@ -640,7 +640,7 @@ namespace object_detect
         dist_qual_t enval = (dist_qual_t)val;
         loaded_vals_xy.insert({enval, keyval.second});
       }
-      std::map<dist_qual_t, int> loaded_vals_z;
+      std::map<dist_qual_t, double> loaded_vals_z;
       for (const auto& keyval : cov_coeffs_z)
       {
         int val;
@@ -661,6 +661,7 @@ namespace object_detect
           continue;
         }
         m_cov_coeffs.insert({keyval.first, {keyval.second, it->second}});
+        ROS_INFO("[%s]: Inserting xyz coeffs: [%.2f, %.2f, %.2f].", m_node_name.c_str(), keyval.second, keyval.second, it->second);
       }
       for (const auto& keyval : loaded_vals_z)
         if (loaded_vals_xy.find(keyval.first) == std::end(loaded_vals_xy))
