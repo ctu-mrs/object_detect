@@ -41,8 +41,8 @@ namespace object_detect
       //}
 
       /* Prepare debug image if needed //{ */
-      const bool publish_debug = dm_ready && m_pub_debug.getNumSubscribers() > 0;
       const bool publish_debug_dm = m_drmgr_ptr->config.debug_image_source == 1;
+      const bool publish_debug = (!publish_debug_dm || dm_ready) && m_pub_debug.getNumSubscribers() > 0;
       cv::Mat dbg_img;
       if (publish_debug)
       {
@@ -123,7 +123,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color, publish_debug_dm ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           cout << "Depthmap distance: " << depthmap_distance << endl;
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
