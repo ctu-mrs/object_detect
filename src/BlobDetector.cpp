@@ -4,20 +4,25 @@ using namespace cv;
 using namespace std;
 using namespace object_detect;
 
-BlobDetector::BlobDetector(const drcfg_t& dr_config)
-  : m_params(dr_config)
+BlobDetector::BlobDetector()
+  :
+    m_use_ocl(false)
 {
-  m_drcfg = dr_config;
 }
 
-BlobDetector::BlobDetector(const drcfg_t& dr_config, const std::string& ocl_lut_kernel_filename)
-  : m_params(dr_config)
+BlobDetector::BlobDetector(const std::string& ocl_lut_kernel_filename)
+  :
+    m_use_ocl(true)
 {
-  m_drcfg = dr_config;
   const std::string ocl_options = "";
   m_ocl_lut_kernel = load_ocl_kernel(ocl_lut_kernel_filename, "ocl_lut_kernel", ocl_options);
   m_main_queue.create(cv::ocl::Context::getDefault(false), cv::ocl::Device::getDefault());
   m_thread_count = cv::ocl::Device::getDefault().maxWorkGroupSize();
+}
+
+void BlobDetector::set_drcfg(const drcfg_t& drcfg)
+{
+  m_drcfg = drcfg;
 }
 
 /* BlobDetector::load_ocl_kernel() method //{ */
@@ -25,15 +30,16 @@ BlobDetector::BlobDetector(const drcfg_t& dr_config, const std::string& ocl_lut_
 cv::ocl::Kernel BlobDetector::load_ocl_kernel(const std::string& filename, const std::string& kernel_name, const std::string& options)
 {
   ROS_INFO_STREAM("[BlobDetector]: Loading OpenCL kernel file \" " << filename << "\"");
-  std::ifstream ifstr(filename);
+  std::ifstream ifstr(filename, std::ios::binary);
   if (!ifstr.is_open())
   {
     ROS_ERROR("[BlobDetector]: Failed to open OpenCL kernel file!");
     return cv::ocl::Kernel();
   }
-  std::string str;
-  ifstr >> str;
-  return cv::ocl::Kernel(kernel_name.c_str(), cv::ocl::ProgramSource(str), options);
+  std::string str((std::istreambuf_iterator<char>(ifstr)),
+                   std::istreambuf_iterator<char>());
+  /* std::cout << "'" << str << "'" << std::endl; */
+  return cv::ocl::Kernel(kernel_name.c_str(), cv::ocl::ProgramSource(str.c_str()), options.c_str());
 }
 
 //}
@@ -61,37 +67,37 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
 
     blob.area = moms.m00;
 
-    if (m_params.filter_by_area)
+    if (m_drcfg.filter_by_area)
     {
       const double area = moms.m00;
-      if (area < m_params.min_area || area >= m_params.max_area)
+      if (area < m_drcfg.min_area || area >= m_drcfg.max_area)
         continue;
     }
 
-    if (m_params.filter_by_circularity)
+    if (m_drcfg.filter_by_circularity)
     {
       const double area = moms.m00;
       const double perimeter = arcLength(Mat(contours[contourIdx]), true);
       const double ratio = 4 * CV_PI * area / (perimeter * perimeter);
       blob.circularity = ratio;
-      if (ratio < m_params.min_circularity || ratio >= m_params.max_circularity)
+      if (ratio < m_drcfg.min_circularity || ratio >= m_drcfg.max_circularity)
         continue;
     }
 
     /* Filter by orientation //{ */
-    if (m_params.filter_by_orientation)
+    if (m_drcfg.filter_by_orientation)
     {
       constexpr double eps = 1e-3;
       double angle = 0;
       if (abs(moms.mu20 - moms.mu02) > eps)
         angle = abs(0.5 * atan2((2 * moms.mu11), (moms.mu20 - moms.mu02)));
       blob.angle = angle;
-      if (m_params.filter_by_orientation && (angle < m_params.min_angle || angle > m_params.max_angle))
+      if (m_drcfg.filter_by_orientation && (angle < m_drcfg.min_angle || angle > m_drcfg.max_angle))
         continue;
     }
     //}
 
-    if (m_params.filter_by_inertia)
+    if (m_drcfg.filter_by_inertia)
     {
       const double denominator = std::sqrt(std::pow(2 * moms.mu11, 2) + std::pow(moms.mu20 - moms.mu02, 2));
       const double eps = 1e-2;
@@ -112,13 +118,13 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
       }
 
       blob.inertia = ratio;
-      if (ratio < m_params.min_inertia_ratio || ratio >= m_params.max_inertia_ratio)
+      if (ratio < m_drcfg.min_inertia_ratio || ratio >= m_drcfg.max_inertia_ratio)
         continue;
 
       blob.confidence = ratio * ratio;
     }
 
-    if (m_params.filter_by_convexity)
+    if (m_drcfg.filter_by_convexity)
     {
       std::vector<Point> hull;
       convexHull(Mat(contours[contourIdx]), hull);
@@ -126,12 +132,12 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
       const double hullArea = contourArea(Mat(hull));
       const double ratio = area / hullArea;
       blob.convexity = ratio;
-      if (ratio < m_params.min_convexity || ratio >= m_params.max_convexity)
+      if (ratio < m_drcfg.min_convexity || ratio >= m_drcfg.max_convexity)
         continue;
     }
 
     // compute blob radius
-    switch (m_params.blob_radius_method)
+    switch (m_drcfg.blob_radius_method)
     {
       case 0:
         {
@@ -191,11 +197,15 @@ void BlobDetector::preprocess_image(cv::Mat& inout_img) const
 //}
 
 /* BlobDetector::detect() method //{ */
-std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const std::vector<SegConf>& seg_confs, cv::OutputArray label_img)
+std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const std::vector<SegConf>& seg_confs, cv::OutputArray p_labels_img)
 {
   std::vector<Blob> blobs;
   preprocess_image(in_img);
-  const cv::Mat labels_img = segment_image(in_img, lut);
+  cv::Mat labels_img;
+  if (m_use_ocl)
+    segment_image_ocl(in_img, lut, labels_img);
+  else
+    segment_image(in_img, lut, labels_img);
 
   for (const auto& seg_conf : seg_confs)
   {
@@ -203,8 +213,8 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const s
     const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
   }
-  if (label_img.needed())
-    labels_img.copyTo(label_img);
+  if (p_labels_img.needed())
+    labels_img.copyTo(p_labels_img);
   return blobs;
 }
 //}
@@ -487,15 +497,16 @@ class parallelSegment : public ParallelLoopBody
 //}
 
 /* BlobDetector::segment_image() method //{ */
-cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut) const
+bool BlobDetector::segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, cv::OutputArray p_labels_img) const
 {
-  cv::Mat binary_img;
+  const cv::Mat in_img = p_in_img.getMat();
+  const cv::Mat lut = p_lut.getMat();
+  cv::Mat labels_img(in_img.size(), CV_8UC1);
   Size size = in_img.size();
-  binary_img.create(size, CV_8UC1);
   // here is the idiom: check the arrays for continuity and,
   // if this is the case,
   // treat the arrays as 1D vectors
-  if (in_img.isContinuous() && binary_img.isContinuous())
+  if (in_img.isContinuous() && labels_img.isContinuous())
   {
     size.width *= size.height;
     size.height = 1;
@@ -505,7 +516,7 @@ cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut) const
     // when the arrays are continuous,
     // the outer loop is executed only once
     const uint8_t* const sptr_row = in_img.ptr<uint8_t>(i);
-    uint8_t* dptr = binary_img.ptr<uint8_t>(i);
+    uint8_t* dptr = labels_img.ptr<uint8_t>(i);
     parallel_for_(Range(0, size.width), parallelSegment(sptr_row, dptr, lut));
     /* for (int j = 0; j < size.width; j++) */
     /* { */
@@ -515,56 +526,41 @@ cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut) const
     /*   dptr[j] = lookup_lut(lut, cur_r, cur_g, cur_b); */
     /* } */
   }
-  return binary_img;
+  labels_img.copyTo(p_labels_img);
+  return true;
 }
 //}
 
 /* BlobDetector::segment_image_ocl() method //{ */
-bool BlobDetector::segment_image_ocl(cv::InputArray in_img, cv::InputArray lut, cv::OutputArray label_img)
+bool BlobDetector::segment_image_ocl(cv::InputArray p_in_img, cv::InputArray p_lut, cv::OutputArray p_labels_img)
 {
-  cv::UMat in_img_umat = in_img.getUMat();
-  cv::UMat lut_umat = lut.getUMat();
-  cv::UMat label_img_umat = label_img.getUMat();
+  cv::UMat in_img = p_in_img.getUMat();
+  cv::UMat lut = p_lut.getUMat();
+  /* cv::UMat label_img_umat = label_img.getUMat(); */
+  cv::UMat label_img(in_img.size(), CV_8UC1);
+  // ensure all matrices are continuous
+  if (!in_img.isContinuous())
+    in_img = in_img.clone();
+  if (!lut.isContinuous())
+    lut = lut.clone();
+  if (!label_img.isContinuous())
+    label_img = label_img.clone();
 
   int ki = 0;
-  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::ReadOnly(in_img_umat));
-  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::ReadOnly(lut_umat));
-  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::WriteOnly(label_img_umat));
+  ki = m_ocl_lut_kernel.set(ki, (int)lut_dim);
+  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::ReadOnlyNoSize(in_img));
+  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::ReadOnlyNoSize(lut));
+  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::WriteOnlyNoSize(label_img));
   
-  size_t globalsize[2] = {m_thread_count, 1};
-  size_t localsize[2] = {m_thread_count, 1};
+  constexpr int dims = 1;
+  size_t globalsize[dims] = {(size_t)in_img.cols*(size_t)in_img.rows};
+  /* size_t localsize[dims] = {m_thread_count, m_thread_count}; */
 
-  return m_ocl_lut_kernel.run(2, globalsize, localsize, true, m_main_queue);
-}
-//}
-
-/* Params constructor //{ */
-Params::Params(drcfg_t cfg)
-{
-  blob_radius_method = cfg.blob_radius_method;
-  // Filter by area
-  filter_by_area = cfg.filter_by_area;
-  min_area = cfg.min_area;
-  max_area = cfg.max_area;
-  // Filter by circularity
-  filter_by_circularity = cfg.filter_by_circularity;
-  min_circularity = cfg.min_circularity;
-  max_circularity = cfg.max_circularity;
-  // Filter by orientation
-  filter_by_orientation = cfg.filter_by_orientation;
-  min_angle = cfg.min_angle;
-  max_angle = cfg.max_angle;
-  // Filter by convexity
-  filter_by_convexity = cfg.filter_by_convexity;
-  min_convexity = cfg.min_convexity;
-  max_convexity = cfg.max_convexity;
-  // Filter by inertia
-  filter_by_inertia = cfg.filter_by_inertia;
-  min_inertia_ratio = cfg.min_inertia_ratio;
-  max_inertia_ratio = cfg.max_inertia_ratio;
-  // Other filtering criterions
-  min_dist_between = cfg.min_dist_between;
-  min_repeatability = cfg.min_repeatability;
+  bool success = m_ocl_lut_kernel.run(dims, globalsize, nullptr, true, m_main_queue);
+  if (!success)
+    ROS_ERROR("[BlobDetector]: Failed running kernel!");
+  label_img.copyTo(p_labels_img);
+  return success;
 }
 //}
 

@@ -1,14 +1,15 @@
 __kernel void ocl_lut_kernel(
-    __global const uchar* src_ptr, int src_step, int src_offset, int src_rows, int src_cols,
-    __global const uchar* lut_ptr, int lut_step, int lut_offset, int lut_rows, int lut_cols,
-    __global uchar* out_ptr, int out_step, int out_offset, int out_rows, int out_cols,
+    const int lut_dim,
+    __global const uchar* src_ptr, const int src_step, const int src_offset,
+    __global const uchar* lut_ptr, const int lut_step, const int lut_offset,
+    __global uchar* out_ptr, const int out_step, const int out_offset
     )
 {
-
-  __local CT smem[LOCAL_SIZE];
-  __local float localmem_max[WGS2_ALIGNED];
-  __local uint localmem_maxloc[WGS2_ALIGNED];
-
-  const int x = get_global_id(0);
-  const int y = get_group_id(1);
+  const int it = get_global_id(0);
+  const uchar r = src_ptr[3*it + 0];
+  const uchar g = src_ptr[3*it + 1];
+  const uchar b = src_ptr[3*it + 2];
+  const uchar l = lut_ptr[(int)r + (int)g*lut_dim + (int)b*lut_dim*lut_dim];
+  out_ptr[it] = l;
 }
+

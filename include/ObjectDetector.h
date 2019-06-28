@@ -231,6 +231,7 @@ namespace object_detect
       /* Other variables //{ */
       const std::string m_node_name;
       bool m_is_initialized;
+      BlobDetector m_blob_det;
       int m_prev_color_id;
       lut_t m_cur_lut;
       std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;

@@ -73,15 +73,15 @@ namespace object_detect
         }
         for (const auto& seg_conf : m_active_seg_confs)
           NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
-        BlobDetector blob_det(m_drmgr_ptr->config, m_ocl_lut_kernel_file);
+        m_blob_det.set_drcfg(m_drmgr_ptr->config);
         if (m_drmgr_ptr->config.override_settings)
         {
           if (!m_active_seg_confs.empty())
             m_active_seg_confs.at(0) = load_segmentation_config(m_drmgr_ptr->config);
-          blobs = blob_det.detect(rgb_img, m_active_seg_confs, label_img);
+          blobs = m_blob_det.detect(rgb_img, m_active_seg_confs, label_img);
         } else
         {
-          blobs = blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
+          blobs = m_blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
         }
       }
       if (publish_debug)
@@ -752,6 +752,9 @@ namespace object_detect
       const auto lut_dur = lut_end_time - lut_start_time;
       ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
     }
+
+    m_blob_det = BlobDetector(m_ocl_lut_kernel_file);
+
     m_is_initialized = true;
 
     /* timers  //{ */

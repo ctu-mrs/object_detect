@@ -35,50 +35,20 @@ namespace object_detect
     std::vector<std::vector<cv::Point> > contours;
   };
 
-  struct Params
-  {
-    int blob_radius_method;
-    // Filter by area
-    bool filter_by_area;
-    int min_area;
-    int max_area;
-    // Filter by circularity
-    bool filter_by_circularity;
-    double min_circularity;
-    double max_circularity;
-    // Filter by convexity
-    bool filter_by_convexity;
-    double min_convexity;
-    double max_convexity;
-    // Filter by orientation
-    bool filter_by_orientation;
-    double min_angle;
-    double max_angle;
-    // Filter by inertia
-    bool filter_by_inertia;
-    double min_inertia_ratio;
-    double max_inertia_ratio;
-    // Other filtering criterions
-    double min_dist_between;
-    size_t min_repeatability;
-
-    Params(drcfg_t cfg);
-  };
-
-
   class BlobDetector
   {
     public:
-      BlobDetector(const drcfg_t& dr_config);
-      BlobDetector(const drcfg_t& dr_config, const std::string& ocl_lut_kernel_filename);
+      BlobDetector();
+      BlobDetector(const std::string& ocl_lut_kernel_filename);
+      void set_drcfg(const drcfg_t& drcfg);
       std::vector<Blob> detect(cv::Mat in_img, const lut_t& lut, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img = cv::noArray());
       std::vector<Blob> detect(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray thresholded_img = cv::noArray());
 
     private:
       drcfg_t m_drcfg;
-      Params m_params;
 
     private:
+      bool m_use_ocl;
       size_t m_thread_count;
       cv::ocl::Queue m_main_queue;
       cv::ocl::Kernel m_ocl_lut_kernel;
@@ -88,7 +58,7 @@ namespace object_detect
       cv::Mat binarize_image(cv::Mat hsv_img, cv::Mat lab_img, const SegConf& seg_conf) const;
       cv::Mat binarize_image(cv::Mat label_img, const SegConf& seg_conf) const;
       std::vector<Blob> find_blobs(const cv::Mat binary_image, const lut_elem_t color_label) const;
-      cv::Mat segment_image(cv::Mat in_img, const lut_t& lut) const;
+      bool segment_image(cv::InputArray in_img, cv::InputArray lut, cv::OutputArray label_img) const;
       bool segment_image_ocl(cv::InputArray in_img, cv::InputArray lut, cv::OutputArray label_img);
       cv::Mat threshold_hsv(cv::Mat hsv_img, const SegConf& seg_conf) const;
       cv::Mat threshold_lab(cv::Mat lab_img, const SegConf& seg_conf) const;
