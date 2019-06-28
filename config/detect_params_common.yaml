@@ -17,9 +17,9 @@ cov_coeffs:
     both:        0.8
   z:
     no_estimate: 666.0
-    blob_size:   2.0
-    depthmap:    1.0
-    both:        0.5
+    blob_size:   6.0
+    depthmap:    3.0
+    both:        2.5
 
 ############### Default parameters for the dynamic reconfigure ################
 filter_by_area: true

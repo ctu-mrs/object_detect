@@ -41,12 +41,24 @@ namespace object_detect
       //}
 
       /* Prepare debug image if needed //{ */
-      bool publish_debug = m_pub_debug.getNumSubscribers() > 0;
+      const bool publish_debug = dm_ready && m_pub_debug.getNumSubscribers() > 0;
+      const bool publish_debug_dm = m_drmgr_ptr->config.debug_image_source == 1;
       cv::Mat dbg_img;
       if (publish_debug)
       {
-        cv::cvtColor(rgb_img, dbg_img, cv::COLOR_BGR2GRAY);
-        cv::cvtColor(dbg_img, dbg_img, cv::COLOR_GRAY2BGR);
+        if (publish_debug_dm)
+        {
+          cv::Mat im_8UC1;
+          const double min = 0;
+          const double max = 40000;
+          dm_img.convertTo(im_8UC1, CV_8UC1, 255.0 / (max-min), -min * 255.0 / (max-min)); 
+          cv::cvtColor(im_8UC1, dbg_img, cv::COLOR_GRAY2BGR);
+          /* applyColorMap(im_8UC1, dbg_img, cv::COLORMAP_JET); */
+        } else
+        {
+          cv::cvtColor(rgb_img, dbg_img, cv::COLOR_BGR2GRAY);
+          cv::cvtColor(dbg_img, dbg_img, cv::COLOR_GRAY2BGR);
+        }
       }
       //}
 
@@ -111,7 +123,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color);
+          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color, publish_debug_dm ? dbg_img : cv::noArray());
           cout << "Depthmap distance: " << depthmap_distance << endl;
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -431,9 +443,14 @@ namespace object_detect
         const float u = tmp_topleft.x + x;
         const float v = tmp_topleft.y + y;
         dm_dist += depth2range(depth, u, v, m_dm_camera_model.fx(), m_dm_camera_model.fy(), m_dm_camera_model.cx(), m_dm_camera_model.cy());
-        n_dm_samples++;
-        if (publish_debug)
-          mark_pixel(tmp_dbg_img, x, y, 2);
+        if (std::isnan(dm_dist))
+          ROS_WARN("[ObjectDetector]: Distance is nan! Skipping.");
+        else
+        {
+          n_dm_samples++;
+          if (publish_debug)
+            mark_pixel(tmp_dbg_img, x, y, 2);
+        }
       }
     }
     if (n_dm_samples > 0)
