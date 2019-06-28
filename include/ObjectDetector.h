@@ -195,6 +195,7 @@ namespace object_detect
       double m_max_dist_diff;
       double m_min_depth;
       double m_max_depth;
+      std::string m_ocl_lut_kernel_file;
       std::vector<SegConf> m_seg_confs;
       std::mutex m_active_seg_confs_mtx;
       std::vector<SegConf> m_active_seg_confs;

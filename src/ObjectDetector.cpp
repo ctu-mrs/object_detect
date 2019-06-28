@@ -41,8 +41,8 @@ namespace object_detect
       //}
 
       /* Prepare debug image if needed //{ */
-      const bool publish_debug = dm_ready && m_pub_debug.getNumSubscribers() > 0;
       const bool publish_debug_dm = m_drmgr_ptr->config.debug_image_source == 1;
+      const bool publish_debug = (!publish_debug_dm || dm_ready) && m_pub_debug.getNumSubscribers() > 0;
       cv::Mat dbg_img;
       if (publish_debug)
       {
@@ -73,7 +73,7 @@ namespace object_detect
         }
         for (const auto& seg_conf : m_active_seg_confs)
           NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
-        BlobDetector blob_det(m_drmgr_ptr->config);
+        BlobDetector blob_det(m_drmgr_ptr->config, m_ocl_lut_kernel_file);
         if (m_drmgr_ptr->config.override_settings)
         {
           if (!m_active_seg_confs.empty())
@@ -123,7 +123,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color, publish_debug_dm ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           cout << "Depthmap distance: " << depthmap_distance << endl;
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -638,6 +638,7 @@ namespace object_detect
     pl.load_param("max_dist_diff", m_max_dist_diff);
     pl.load_param("min_depth", m_min_depth);
     pl.load_param("max_depth", m_max_depth);
+    pl.load_param("ocl_lut_kernel_file", m_ocl_lut_kernel_file);
 
     /* load covariance coefficients //{ */
     

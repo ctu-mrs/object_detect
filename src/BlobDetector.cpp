@@ -10,6 +10,34 @@ BlobDetector::BlobDetector(const drcfg_t& dr_config)
   m_drcfg = dr_config;
 }
 
+BlobDetector::BlobDetector(const drcfg_t& dr_config, const std::string& ocl_lut_kernel_filename)
+  : m_params(dr_config)
+{
+  m_drcfg = dr_config;
+  const std::string ocl_options = "";
+  m_ocl_lut_kernel = load_ocl_kernel(ocl_lut_kernel_filename, "ocl_lut_kernel", ocl_options);
+  m_main_queue.create(cv::ocl::Context::getDefault(false), cv::ocl::Device::getDefault());
+  m_thread_count = cv::ocl::Device::getDefault().maxWorkGroupSize();
+}
+
+/* BlobDetector::load_ocl_kernel() method //{ */
+
+cv::ocl::Kernel BlobDetector::load_ocl_kernel(const std::string& filename, const std::string& kernel_name, const std::string& options)
+{
+  ROS_INFO_STREAM("[BlobDetector]: Loading OpenCL kernel file \" " << filename << "\"");
+  std::ifstream ifstr(filename);
+  if (!ifstr.is_open())
+  {
+    ROS_ERROR("[BlobDetector]: Failed to open OpenCL kernel file!");
+    return cv::ocl::Kernel();
+  }
+  std::string str;
+  ifstr >> str;
+  return cv::ocl::Kernel(kernel_name.c_str(), cv::ocl::ProgramSource(str), options);
+}
+
+//}
+
 /* BlobDetector::find_blobs() method //{ */
 std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut_elem_t color_label) const
 {
@@ -488,6 +516,25 @@ cv::Mat BlobDetector::segment_image(cv::Mat in_img, const lut_t& lut) const
     /* } */
   }
   return binary_img;
+}
+//}
+
+/* BlobDetector::segment_image_ocl() method //{ */
+bool BlobDetector::segment_image_ocl(cv::InputArray in_img, cv::InputArray lut, cv::OutputArray label_img)
+{
+  cv::UMat in_img_umat = in_img.getUMat();
+  cv::UMat lut_umat = lut.getUMat();
+  cv::UMat label_img_umat = label_img.getUMat();
+
+  int ki = 0;
+  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::ReadOnly(in_img_umat));
+  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::ReadOnly(lut_umat));
+  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::WriteOnly(label_img_umat));
+  
+  size_t globalsize[2] = {m_thread_count, 1};
+  size_t localsize[2] = {m_thread_count, 1};
+
+  return m_ocl_lut_kernel.run(2, globalsize, localsize, true, m_main_queue);
 }
 //}
 
