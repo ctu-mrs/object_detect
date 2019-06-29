@@ -10,14 +10,68 @@ BlobDetector::BlobDetector()
 {
 }
 
+std::string get_ocl_vendor(const cv::ocl::Device& ocl_device)
+{
+  return ocl_device.vendorName();
+  /* std::string ret = "unknown"; */
+  /* if (ocl_device.isIntel()) */
+  /*   ret = "Intel"; */
+  /* if (ocl_device.isAMD()) */
+  /*   ret = "AMD"; */
+  /* if (ocl_device.isNVidia()) */
+  /*   ret = "NVidia"; */
+  /* return ret; */
+}
+
+std::string get_ocl_type(const cv::ocl::Device& ocl_device)
+{
+  std::string ret = "unknown";
+  switch (ocl_device.type())
+  {
+    case cv::ocl::Device::TYPE_DEFAULT:
+      ret = "DEFAULT";
+      break;
+    case cv::ocl::Device::TYPE_CPU:
+      ret = "CPU";
+      break;
+    case cv::ocl::Device::TYPE_GPU:
+      ret = "GPU";
+      break;
+    case cv::ocl::Device::TYPE_ACCELERATOR:
+      ret = "ACCELERATOR";
+      break;
+    case cv::ocl::Device::TYPE_DGPU:
+      ret = "DGPU";
+      break;
+    case cv::ocl::Device::TYPE_IGPU:
+      ret = "IGPU";
+      break;
+    case cv::ocl::Device::TYPE_ALL:
+      ret = "ALL";
+      break;
+  }
+  return ret;
+}
+
 BlobDetector::BlobDetector(const std::string& ocl_lut_kernel_filename)
   :
     m_use_ocl(true)
 {
   const std::string ocl_options = "";
   m_ocl_lut_kernel = load_ocl_kernel(ocl_lut_kernel_filename, "ocl_lut_kernel", ocl_options);
-  m_main_queue.create(cv::ocl::Context::getDefault(false), cv::ocl::Device::getDefault());
-  m_thread_count = cv::ocl::Device::getDefault().maxWorkGroupSize();
+  m_ocl_bitwise_and_kernel = load_ocl_kernel(ocl_lut_kernel_filename, "ocl_bitwise_and_kernel", ocl_options);
+
+  auto ocl_context = cv::ocl::Context::getDefault(false);
+  auto ocl_device = cv::ocl::Device::getDefault();
+  const std::string ocl_version = ocl_device.OpenCLVersion();
+  const std::string name = ocl_device.name();
+  const std::string type = get_ocl_type(ocl_device);
+  const std::string vendor = get_ocl_vendor(ocl_device);
+  const std::string driver = ocl_device.driverVersion();
+  ROS_INFO("[BlobDetector]: Initialized OpenCL device:\n\tName:\t%s:\n\tType:\t%s\n\tVendor:\t%s\n\tDriver:\t%s\n\tOpenCL version:\t%s", name.c_str(), type.c_str(), vendor.c_str(), driver.c_str(), ocl_version.c_str());
+
+  m_main_queue.create(ocl_context, ocl_device);
+  m_thread_count = ocl_device.maxWorkGroupSize();
 }
 
 void BlobDetector::set_drcfg(const drcfg_t& drcfg)
@@ -199,13 +253,17 @@ void BlobDetector::preprocess_image(cv::Mat& inout_img) const
 /* BlobDetector::detect() method //{ */
 std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const std::vector<SegConf>& seg_confs, cv::OutputArray p_labels_img)
 {
+  m_t_start = ros::WallTime::now();
   std::vector<Blob> blobs;
   preprocess_image(in_img);
+  m_t_preprocess = ros::WallTime::now();
+  bool ocl_success = false;
   cv::Mat labels_img;
   if (m_use_ocl)
-    segment_image_ocl(in_img, lut, labels_img);
-  else
+    ocl_success = segment_image_ocl(in_img, lut, labels_img);
+  if (!ocl_success)
     segment_image(in_img, lut, labels_img);
+  m_t_segment = ros::WallTime::now();
 
   for (const auto& seg_conf : seg_confs)
   {
@@ -213,8 +271,17 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const s
     const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
   }
+  m_t_findblobs = ros::WallTime::now();
   if (p_labels_img.needed())
     labels_img.copyTo(p_labels_img);
+  m_t_finish = ros::WallTime::now();
+  const std::string ocl_str = ocl_success ? " (with OpenCL)" : "";
+  const double preproc_ms = (m_t_preprocess - m_t_start).toSec()*1000.0;
+  const double segment_ms = (m_t_segment - m_t_preprocess).toSec()*1000.0;
+  const double fblobs_ms = (m_t_findblobs - m_t_segment).toSec()*1000.0;
+  const double finish_ms = (m_t_finish - m_t_findblobs).toSec()*1000.0;
+  const double total_ms = (m_t_finish - m_t_start).toSec()*1000.0;
+  ROS_INFO("[BlobDetector]: profiling%s\n\tpreproc:\t%.2f\n\tsegment:\t%.2f\n\tfblobs:\t%.2f\n\tfinish:%.2f\n\ttotal:%.2f", ocl_str.c_str(), preproc_ms, segment_ms, fblobs_ms, finish_ms, total_ms);
   return blobs;
 }
 //}
@@ -264,11 +331,15 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
 //}
 
 /* BlobDetector::binarize_image() method //{ */
-cv::Mat BlobDetector::binarize_image(cv::Mat label_img, const SegConf& seg_conf) const
+cv::Mat BlobDetector::binarize_image(cv::Mat label_img, const SegConf& seg_conf)
 {
   cv::Scalar color_label(seg_conf.color);
   cv::Mat binary_img;
-  cv::bitwise_and(label_img, color_label, binary_img);
+  bool ocl_success = false;
+  if (m_use_ocl)
+    ocl_success = bitwise_and_ocl(seg_conf.color, label_img, binary_img);
+  if (!ocl_success)
+    cv::bitwise_and(label_img, color_label, binary_img);
 
   /* Preprocess the binary image (fill holes) //{ */
   // fill holes in the image
@@ -279,7 +350,7 @@ cv::Mat BlobDetector::binarize_image(cv::Mat label_img, const SegConf& seg_conf)
     case 1:  // using findContours
     {
       vector<vector<cv::Point>> contours;
-      cv::findContours(binary_img, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);  // this line sometimes throws error :(
+      cv::findContours(binary_img, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
       cv::drawContours(binary_img, contours, -1, cv::Scalar(255), CV_FILLED, LINE_8);
       break;
     }
@@ -328,7 +399,7 @@ cv::Mat BlobDetector::binarize_image(cv::Mat hsv_img, cv::Mat lab_img, const Seg
     case 1:  // using findContours
     {
       vector<vector<cv::Point>> contours;
-      cv::findContours(binary_img, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);  // this line sometimes throws error :(
+      cv::findContours(binary_img, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
       cv::drawContours(binary_img, contours, -1, cv::Scalar(255), CV_FILLED, LINE_8);
       break;
     }
@@ -560,6 +631,33 @@ bool BlobDetector::segment_image_ocl(cv::InputArray p_in_img, cv::InputArray p_l
   if (!success)
     ROS_ERROR("[BlobDetector]: Failed running kernel!");
   label_img.copyTo(p_labels_img);
+  return success;
+}
+//}
+
+/* BlobDetector::bitwise_and_ocl() method //{ */
+bool BlobDetector::bitwise_and_ocl(uint8_t value, cv::InputArray p_in_img, cv::OutputArray p_out_img)
+{
+  cv::UMat in_img = p_in_img.getUMat();
+  cv::UMat out_img(in_img.size(), in_img.type());
+  // ensure all matrices are continuous
+  if (!in_img.isContinuous())
+    in_img = in_img.clone();
+  if (!out_img.isContinuous())
+    out_img = out_img.clone();
+
+  int ki = 0;
+  ki = m_ocl_bitwise_and_kernel.set(ki, value);
+  ki = m_ocl_bitwise_and_kernel.set(ki, cv::ocl::KernelArg::ReadOnlyNoSize(in_img));
+  ki = m_ocl_bitwise_and_kernel.set(ki, cv::ocl::KernelArg::WriteOnlyNoSize(out_img));
+  
+  constexpr int dims = 1;
+  size_t globalsize[dims] = {(size_t)in_img.cols*(size_t)in_img.rows};
+
+  bool success = m_ocl_bitwise_and_kernel.run(dims, globalsize, nullptr, true, m_main_queue);
+  if (!success)
+    ROS_ERROR("[BlobDetector]: Failed running kernel!");
+  out_img.copyTo(p_out_img);
   return success;
 }
 //}

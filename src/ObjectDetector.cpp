@@ -74,6 +74,7 @@ namespace object_detect
         for (const auto& seg_conf : m_active_seg_confs)
           NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
         m_blob_det.set_drcfg(m_drmgr_ptr->config);
+        m_blob_det_ocl.set_drcfg(m_drmgr_ptr->config);
         if (m_drmgr_ptr->config.override_settings)
         {
           if (!m_active_seg_confs.empty())
@@ -82,6 +83,7 @@ namespace object_detect
         } else
         {
           blobs = m_blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
+          blobs = m_blob_det_ocl.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
         }
       }
       if (publish_debug)
@@ -753,7 +755,13 @@ namespace object_detect
       ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
     }
 
-    m_blob_det = BlobDetector(m_ocl_lut_kernel_file);
+/* #ifdef USE_OPENCL */
+/*     m_blob_det = BlobDetector(m_ocl_lut_kernel_file); */
+/* #else */
+/*     m_blob_det = BlobDetector(); */
+/* #endif */
+    m_blob_det = BlobDetector();
+    m_blob_det_ocl = BlobDetector(m_ocl_lut_kernel_file);
 
     m_is_initialized = true;
 
