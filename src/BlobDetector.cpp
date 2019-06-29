@@ -53,13 +53,19 @@ std::string get_ocl_type(const cv::ocl::Device& ocl_device)
   return ret;
 }
 
-BlobDetector::BlobDetector(const std::string& ocl_lut_kernel_filename)
+BlobDetector::BlobDetector(const std::string& ocl_kernel_filename)
   :
     m_use_ocl(true)
 {
   const std::string ocl_options = "";
-  m_ocl_lut_kernel = load_ocl_kernel(ocl_lut_kernel_filename, "ocl_lut_kernel", ocl_options);
-  m_ocl_bitwise_and_kernel = load_ocl_kernel(ocl_lut_kernel_filename, "ocl_bitwise_and_kernel", ocl_options);
+  m_ocl_lut_kernel = load_ocl_kernel(ocl_kernel_filename, "ocl_lut_kernel", ocl_options);
+  m_ocl_bitwise_and_kernel = load_ocl_kernel(ocl_kernel_filename, "ocl_bitwise_and_kernel", ocl_options);
+  m_ocl_seg_kernel = load_ocl_kernel(ocl_kernel_filename, "ocl_seg_kernel", ocl_options);
+  /* if (m_ocl_seg_kernel.empty()) */
+  /* { */
+  /*   ROS_ERROR("[BlobDetector]: Disabling OpenCL (not all required kernels were loaded)."); */
+  /*   m_use_ocl = false; */
+  /* } */
 
   auto ocl_context = cv::ocl::Context::getDefault(false);
   auto ocl_device = cv::ocl::Device::getDefault();
@@ -92,8 +98,10 @@ cv::ocl::Kernel BlobDetector::load_ocl_kernel(const std::string& filename, const
   }
   std::string str((std::istreambuf_iterator<char>(ifstr)),
                    std::istreambuf_iterator<char>());
-  /* std::cout << "'" << str << "'" << std::endl; */
-  return cv::ocl::Kernel(kernel_name.c_str(), cv::ocl::ProgramSource(str.c_str()), options.c_str());
+  cv::ocl::Kernel ret(kernel_name.c_str(), cv::ocl::ProgramSource(str.c_str()), options.c_str());
+  if (ret.empty())
+    ROS_ERROR("[BlobDetector]: Failed to load OpenCL kernel \"%s\".", kernel_name.c_str());
+  return ret;
 }
 
 //}
@@ -257,17 +265,28 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const lut_t& lut, const s
   std::vector<Blob> blobs;
   preprocess_image(in_img);
   m_t_preprocess = ros::WallTime::now();
+  std::vector<uint8_t> labels;
+  labels.reserve(seg_confs.size());
+  for (const auto& seg_conf : seg_confs)
+    labels.push_back(seg_conf.color);
+  std::vector<cv::Mat> bin_imgs;
+
+  /* bool ocl_success = segment_image_ocl2(in_img, lut, labels, bin_imgs, p_labels_img); */
   bool ocl_success = false;
   cv::Mat labels_img;
   if (m_use_ocl)
-    ocl_success = segment_image_ocl(in_img, lut, labels_img);
+    ocl_success = segment_image_ocl2(in_img, lut, labels, bin_imgs, labels_img);
+    /* ocl_success = segment_image_ocl(in_img, lut, labels_img); */
   if (!ocl_success)
     segment_image(in_img, lut, labels_img);
+
   m_t_segment = ros::WallTime::now();
 
-  for (const auto& seg_conf : seg_confs)
+  for (size_t it = 0; it < seg_confs.size(); it++)
   {
+    const auto& seg_conf = seg_confs.at(it);
     const cv::Mat binary_img = binarize_image(labels_img, seg_conf);
+    /* const cv::Mat binary_img = bin_imgs.at(it); */
     const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
   }
@@ -619,9 +638,9 @@ bool BlobDetector::segment_image_ocl(cv::InputArray p_in_img, cv::InputArray p_l
 
   int ki = 0;
   ki = m_ocl_lut_kernel.set(ki, (int)lut_dim);
-  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::ReadOnlyNoSize(in_img));
-  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::ReadOnlyNoSize(lut));
-  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::WriteOnlyNoSize(label_img));
+  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(in_img));
+  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(lut));
+  ki = m_ocl_lut_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(label_img));
   
   constexpr int dims = 1;
   size_t globalsize[dims] = {(size_t)in_img.cols*(size_t)in_img.rows};
@@ -648,8 +667,8 @@ bool BlobDetector::bitwise_and_ocl(uint8_t value, cv::InputArray p_in_img, cv::O
 
   int ki = 0;
   ki = m_ocl_bitwise_and_kernel.set(ki, value);
-  ki = m_ocl_bitwise_and_kernel.set(ki, cv::ocl::KernelArg::ReadOnlyNoSize(in_img));
-  ki = m_ocl_bitwise_and_kernel.set(ki, cv::ocl::KernelArg::WriteOnlyNoSize(out_img));
+  ki = m_ocl_bitwise_and_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(in_img));
+  ki = m_ocl_bitwise_and_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(out_img));
   
   constexpr int dims = 1;
   size_t globalsize[dims] = {(size_t)in_img.cols*(size_t)in_img.rows};
@@ -659,6 +678,101 @@ bool BlobDetector::bitwise_and_ocl(uint8_t value, cv::InputArray p_in_img, cv::O
     ROS_ERROR("[BlobDetector]: Failed running kernel!");
   out_img.copyTo(p_out_img);
   return success;
+}
+//}
+
+/* BlobDetector::segment_image_ocl2() method //{ */
+bool BlobDetector::segment_image_ocl2(cv::InputArray p_in_img, cv::InputArray p_lut, cv::InputArray p_labels, std::vector<cv::Mat>& p_bin_imgs, cv::OutputArray p_labels_img)
+{
+  cv::UMat labels = p_labels.getUMat();
+  const int labels_len = labels.cols;
+
+  cv::UMat in_img = p_in_img.getUMat();
+  const int in_img_len = in_img.cols*in_img.rows;
+
+  cv::UMat lut = p_lut.getUMat();
+
+  const cv::Size out_size(in_img_len*labels_len, 1);
+  cv::UMat bin_imgs(out_size, CV_8UC1);
+
+  cv::UMat labels_img(in_img.size(), CV_8UC1);
+  // ensure all matrices are continuous
+  if (!in_img.isContinuous())
+    in_img = in_img.clone();
+  if (!lut.isContinuous())
+    lut = lut.clone();
+  if (!labels_img.isContinuous())
+    labels_img = labels_img.clone();
+
+  int ki = 0;
+  ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(labels));
+  ki = m_ocl_seg_kernel.set(ki, (int)labels_len);
+  ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(in_img));
+  ki = m_ocl_seg_kernel.set(ki, (int)in_img_len);
+  ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(lut));
+  ki = m_ocl_seg_kernel.set(ki, (int)lut_dim);
+  ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(bin_imgs));
+  ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(labels_img));
+  
+  constexpr int dims = 1;
+  size_t globalsize[dims] = {(size_t)in_img.cols*(size_t)in_img.rows};
+  /* size_t localsize[dims] = {m_thread_count, m_thread_count}; */
+
+  bool success = m_ocl_seg_kernel.run(dims, globalsize, nullptr, true, m_main_queue);
+  if (!success)
+    ROS_ERROR("[BlobDetector]: Failed running kernel!");
+  labels_img.copyTo(p_labels_img);
+  return success;
+
+  /* cv::UMat in_img = p_in_img.getUMat(); */
+  /* cv::UMat lut = p_lut.getUMat(); */
+  /* cv::UMat labels = p_labels.getUMat(); */
+  /* const int in_img_len = in_img.cols*in_img.rows; */
+  /* const int labels_len = labels.cols; */
+  /* /1* cv::UMat label_img_umat = label_img.getUMat(); *1/ */
+  /* const cv::Size out_size(in_img_len*labels_len, 1); */
+  /* cv::UMat bin_imgs(out_size, CV_8UC1); */
+  /* cv::UMat labels_img(in_img.size(), CV_8UC1); */
+  /* // ensure all matrices are continuous */
+  /* if (!in_img.isContinuous()) */
+  /*   in_img = in_img.clone(); */
+  /* if (!lut.isContinuous()) */
+  /*   lut = lut.clone(); */
+
+  /* int ki = 0; */
+  /* ki = m_ocl_seg_kernel.set(ki, (int)666); */
+  /* /1* ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(labels)); *1/ */
+  /* /1* ki = m_ocl_seg_kernel.set(ki, (int)labels_len); *1/ */
+  /* /1* ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(in_img)); *1/ */
+  /* /1* ki = m_ocl_seg_kernel.set(ki, (int)in_img_len); *1/ */
+  /* /1* ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(lut)); *1/ */
+  /* /1* ki = m_ocl_seg_kernel.set(ki, (int)lut_dim); *1/ */
+  /* /1* ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(bin_imgs)); *1/ */
+  /* /1* ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(labels_img)); *1/ */
+  
+  /* constexpr int dims = 1; */
+  /* /1* size_t globalsize[dims] = {(size_t)in_img_len}; *1/ */
+  /* size_t globalsize[dims] = {1}; */
+  /* /1* size_t localsize[dims] = {m_thread_count, m_thread_count}; *1/ */
+
+  /* bool success = m_ocl_seg_kernel.run(dims, globalsize, nullptr, true, m_main_queue); */
+  /* if (!success) */
+  /*   ROS_ERROR("[BlobDetector]: Failed running kernel ocl_segment_kernel!"); */
+
+  /* if (p_labels_img.needed()) */
+  /*   labels_img.copyTo(p_labels_img); */
+
+  /* p_bin_imgs.reserve(labels_len); */
+  /* for (int it = 0; it < labels_len; it++) */
+  /* { */
+  /*   cv::Mat bin_img; */
+  /*   cv::UMat ubin_img; */
+  /*   cv::Rect roi(it*in_img_len, 0, in_img_len, 1); */
+  /*   ubin_img = bin_imgs(roi).reshape(1, in_img.rows); */
+  /*   ubin_img.copyTo(bin_img); */
+  /*   p_bin_imgs.push_back(bin_img); */
+  /* } */
+  /* return success; */
 }
 //}
 

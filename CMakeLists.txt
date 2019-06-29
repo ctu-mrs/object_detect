@@ -77,9 +77,9 @@ include_directories(include
 
 # set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -fopenmp -DNDEBUG")
 # set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3 -fopenmp -DNDEBUG")
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3")
-set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3")
-set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -O3")
+set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
+set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
 
 # add_executable(display_tracking src/display_tracking.cpp)
 # add_dependencies(display_tracking
