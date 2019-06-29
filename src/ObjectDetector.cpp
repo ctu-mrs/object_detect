@@ -82,8 +82,8 @@ namespace object_detect
           blobs = m_blob_det.detect(rgb_img, m_active_seg_confs, label_img);
         } else
         {
-          blobs = m_blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
           blobs = m_blob_det_ocl.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img);
+          /* blobs = m_blob_det.detect(rgb_img, m_cur_lut, m_active_seg_confs, label_img); */
         }
       }
       if (publish_debug)
