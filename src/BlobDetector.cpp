@@ -622,9 +622,10 @@ bool BlobDetector::bitwise_and_ocl(uint8_t value, cv::InputArray p_in_img, cv::O
   cv::UMat out_img = p_out_img.getUMat();
   // ensure all matrices are continuous
   if (!in_img.isContinuous())
-    in_img = in_img.clone();
-  if (!out_img.isContinuous())
-    out_img = out_img.clone();
+  {
+    ROS_ERROR("[BlobDetector::segment_image_ocl]: Input image must be continuous! Skipping.");
+    return false;
+  }
 
   int ki = 0;
   ki = m_ocl_bitwise_and_kernel.set(ki, value);
@@ -661,13 +662,15 @@ bool BlobDetector::segment_image_ocl(cv::InputArray p_in_img, cv::InputArray p_l
 
   // ensure all matrices are continuous
   if (!in_img.isContinuous())
-    in_img = in_img.clone();
+  {
+    ROS_ERROR("[BlobDetector::segment_image_ocl]: Input image must be continuous! Skipping.");
+    return false;
+  }
   if (!lut.isContinuous())
-    lut = lut.clone();
-  if (!bin_imgs.isContinuous())
-    bin_imgs = bin_imgs.clone();
-  if (!labels_img.isContinuous())
-    labels_img = labels_img.clone();
+  {
+    ROS_ERROR("[BlobDetector::segment_image_ocl]: LUT must be continuous! Skipping.");
+    return false;
+  }
 
   int ki = 0;
   ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(labels));
