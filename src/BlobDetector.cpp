@@ -219,6 +219,7 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
     switch (m_drcfg.blob_radius_method)
     {
       case 0:
+      // the radius is estimated as maximal distance between points on the contour and its center
         {
           double max_dist = 0.0;
           for (size_t pointIdx = 0; pointIdx < contours[contourIdx].size(); pointIdx++)
@@ -232,6 +233,7 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
           break;
         }
       case 1:
+      // the radius is estimated as median distance between points on the contour and its center
         {
           std::vector<double> dists;
           for (size_t pointIdx = 0; pointIdx < contours[contourIdx].size(); pointIdx++)
@@ -278,10 +280,14 @@ void BlobDetector::preprocess_image(cv::Mat& inout_img) const
 /* BlobDetector::detect() method //{ */
 std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray p_labels_img)
 {
-  m_t_start = ros::WallTime::now();
+#ifdef ENABLE_PROFILING
+  ros::WallTime t_start = ros::WallTime::now();
+#endif
   std::vector<Blob> blobs;
   preprocess_image(in_img);
-  m_t_preprocess = ros::WallTime::now();
+#ifdef ENABLE_PROFILING
+  ros::WallTime t_preprocess = ros::WallTime::now();
+#endif
   std::vector<uint8_t> labels;
   labels.reserve(seg_confs.size());
   for (const auto& seg_conf : seg_confs)
@@ -294,7 +300,9 @@ std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<Seg
   if (!ocl_success)
     segment_image(in_img, m_lut, labels, bin_imgs, p_labels_img);
 
-  m_t_segment = ros::WallTime::now();
+#ifdef ENABLE_PROFILING
+  ros::WallTime t_segment = ros::WallTime::now();
+#endif
 
   for (size_t it = 0; it < seg_confs.size(); it++)
   {
@@ -304,15 +312,15 @@ std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<Seg
     const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
   }
-  m_t_findblobs = ros::WallTime::now();
-  m_t_finish = ros::WallTime::now();
+#ifdef ENABLE_PROFILING
+  ros::WallTime t_finish = ros::WallTime::now();
   const std::string ocl_str = ocl_success ? " (with OpenCL)" : "";
-  const double preproc_ms = (m_t_preprocess - m_t_start).toSec()*1000.0;
-  const double segment_ms = (m_t_segment - m_t_preprocess).toSec()*1000.0;
-  const double fblobs_ms = (m_t_findblobs - m_t_segment).toSec()*1000.0;
-  const double finish_ms = (m_t_finish - m_t_findblobs).toSec()*1000.0;
-  const double total_ms = (m_t_finish - m_t_start).toSec()*1000.0;
+  const double preproc_ms = (t_preprocess - t_start).toSec()*1000.0;
+  const double segment_ms = (t_segment - t_preprocess).toSec()*1000.0;
+  const double fblobs_ms = (t_findblobs - t_finish).toSec()*1000.0;
+  const double total_ms = (m_t_finish - t_start).toSec()*1000.0;
   ROS_INFO("[BlobDetector]: profiling%s\n\tpreproc:\t%.2f\n\tsegment:\t%.2f\n\tfblobs:\t%.2f\n\tfinish:%.2f\n\ttotal:%.2f", ocl_str.c_str(), preproc_ms, segment_ms, fblobs_ms, finish_ms, total_ms);
+#endif
   return blobs;
 }
 //}
@@ -695,10 +703,14 @@ bool BlobDetector::segment_image_ocl(cv::InputArray p_in_img, cv::InputArray p_l
   size_t globalsize[dims] = {(size_t)in_img_len};
   /* size_t localsize[dims] = {m_thread_count, m_thread_count}; */
 
+#ifdef ENABLE_PROFILING
   ros::WallTime start = ros::WallTime::now();
+#endif
   bool success = m_ocl_seg_kernel.run(dims, globalsize, nullptr, true, m_main_queue);
+#ifdef ENABLE_PROFILING
   ros::WallTime end = ros::WallTime::now();
   ROS_INFO("[BlobDetector]: OpenCL runtime: %.2f", (end-start).toSec()*1000.0);
+#endif
   if (!success)
     ROS_ERROR("[BlobDetector]: Failed running kernel \"segmentation\"!");
 

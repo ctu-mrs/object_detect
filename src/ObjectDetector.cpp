@@ -26,7 +26,7 @@ namespace object_detect
     if (rgb_ready)
     {
       /* Copy values from subscribers to local variables //{ */
-      const ros::Time start_t = ros::Time::now();
+      const ros::WallTime start_t = ros::WallTime::now();
       cv::Mat dm_img;
       if (dm_ready)
       {
@@ -63,7 +63,6 @@ namespace object_detect
       //}
 
       std::vector<Blob> blobs;
-      std::vector<Blob> blobs2;
       {
         std::scoped_lock<std::mutex> lck(m_active_seg_confs_mtx);
         /* Detect blobs of required color in the RGB image //{ */
@@ -75,7 +74,6 @@ namespace object_detect
         for (const auto& seg_conf : m_active_seg_confs)
           NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
         m_blob_det.set_drcfg(m_drmgr_ptr->config);
-        m_blob_det_ocl.set_drcfg(m_drmgr_ptr->config);
         if (m_drmgr_ptr->config.override_settings)
         {
           if (!m_active_seg_confs.empty())
@@ -84,31 +82,6 @@ namespace object_detect
         } else
         {
           blobs = m_blob_det.detect_lut(rgb_img, m_active_seg_confs, label_img);
-          blobs2 = m_blob_det_ocl.detect_lut(rgb_img, m_active_seg_confs, label_img);
-          if (blobs.size() == blobs2.size())
-          {
-            for (unsigned it = 0; it < blobs.size(); it++)
-            {
-              const auto blob1 = blobs.at(it);
-              const auto blob2 = blobs2.at(it);
-              if (
-                  blob1.angle != blob2.angle
-              ||  blob1.area != blob2.area
-              ||  blob1.avg_depth != blob2.avg_depth
-              ||  blob1.circularity != blob2.circularity
-              ||  blob1.color != blob2.color
-              ||  blob1.confidence != blob2.confidence
-              ||  blob1.convexity != blob2.convexity
-              ||  blob1.inertia != blob2.inertia
-              ||  blob1.location != blob2.location
-              ||  blob1.radius != blob2.radius
-              )
-              ROS_ERROR("[]: Different blob obtained from CPU and GPU!");
-            }
-          } else
-          {
-            ROS_ERROR("[]: Different number of blobs obtained from CPU and GPU: %lu vs %lu!", blobs.size(), blobs2.size());
-          }
         }
       }
       if (publish_debug)
@@ -252,12 +225,13 @@ namespace object_detect
       //}
 
       /* Some primitive profiling info //{ */
-      ros::Duration dur = ros::Time::now() - start_t;
+      ros::WallDuration dur = ros::WallTime::now() - start_t;
       ros::Duration del = ros::Time::now() - rgb_img_msg->header.stamp;
       static double fps = 1.0 / dur.toSec();
-      fps = 0.1*(1.0 / dur.toSec()) + 0.9*fps;
+      if (dur.toSec() > 0.0)
+        fps = 0.1*(1.0 / dur.toSec()) + 0.9*fps;
       cout << "processing FPS: " << fps << "Hz" << std::endl;
-      cout << "delay: " << del.toSec() * 1000.0 << "ms" << std::endl;
+      cout << "delay: " << del.toSec() * 1000.0 << "ms (processing: " << dur.toSec() * 1000.0 << "ms)" << std::endl;
       //}
 
       ROS_INFO("[%s]: Image processed", m_node_name.c_str());
@@ -665,7 +639,8 @@ namespace object_detect
     pl.load_param("max_dist_diff", m_max_dist_diff);
     pl.load_param("min_depth", m_min_depth);
     pl.load_param("max_depth", m_max_depth);
-    pl.load_param("ocl_lut_kernel_file", m_ocl_lut_kernel_file);
+    std::string ocl_lut_kernel_file = pl.load_param2<std::string>("ocl_lut_kernel_file");
+    bool use_ocl = pl.load_param2<bool>("use_ocl");
 
     /* load covariance coefficients //{ */
     
@@ -780,13 +755,14 @@ namespace object_detect
       ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
     }
 
-/* #ifdef USE_OPENCL */
-/*     m_blob_det = BlobDetector(m_ocl_lut_kernel_file, m_cur_lut); */
-/* #else */
-/*     m_blob_det = BlobDetector(m_cur_lut); */
-/* #endif */
-    m_blob_det_ocl = BlobDetector(m_ocl_lut_kernel_file, m_cur_lut);
-    m_blob_det = BlobDetector(m_cur_lut);
+    if (use_ocl)
+    {
+      m_blob_det = BlobDetector(ocl_lut_kernel_file, m_cur_lut);
+      ROS_INFO("[%s]: Using OpenCL HW acceleration.", m_node_name.c_str());
+    } else
+    {
+      m_blob_det = BlobDetector(m_cur_lut);
+    }
 
     m_is_initialized = true;
 

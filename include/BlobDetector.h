@@ -50,14 +50,6 @@ namespace object_detect
       cv::UMat m_lut;
 
     private:
-      // profiling vars
-      ros::WallTime m_t_start;
-      ros::WallTime m_t_preprocess;
-      ros::WallTime m_t_segment;
-      ros::WallTime m_t_findblobs;
-      ros::WallTime m_t_finish;
-
-    private:
       bool m_use_ocl;
       size_t m_thread_count;
       cv::ocl::Queue m_main_queue;
