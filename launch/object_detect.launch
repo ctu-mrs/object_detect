@@ -42,9 +42,9 @@
       <remap from="~rgb_image" to="$(arg color_image)" />
       <remap from="~rgb_camera_info" to="$(arg color_cinfo)" />
 
-      <remap from="~debug_image" to="~debug_image_" />
-      <remap from="~detected_objects_pcl" to="~detected_objects_pcl_" />
-      <remap from="~detected_objects" to="~detected_objects_" />
+      <remap from="~debug_image" to="~debug_image" />
+      <remap from="~detected_objects_pcl" to="~detected_objects_pcl" />
+      <remap from="~detected_objects" to="~detected_objects" />
 
     </node>
   
