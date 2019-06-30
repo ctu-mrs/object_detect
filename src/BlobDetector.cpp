@@ -4,19 +4,6 @@ using namespace cv;
 using namespace std;
 using namespace object_detect;
 
-BlobDetector::BlobDetector()
-  :
-    m_use_ocl(false)
-{
-}
-
-BlobDetector::BlobDetector(cv::InputArray lut)
-  :
-    m_use_ocl(false)
-{
-  m_lut = lut.getUMat();
-}
-
 /* helper OCL methods //{ */
 
 std::string get_ocl_vendor(const cv::ocl::Device& ocl_device)
@@ -64,6 +51,20 @@ std::string get_ocl_type(const cv::ocl::Device& ocl_device)
 
 //}
 
+/* BlobDetector() constructor //{ */
+BlobDetector::BlobDetector()
+  :
+    m_use_ocl(false)
+{
+}
+
+BlobDetector::BlobDetector(cv::InputArray lut)
+  :
+    m_use_ocl(false)
+{
+  m_lut = lut.getUMat();
+}
+
 BlobDetector::BlobDetector(const std::string& ocl_kernel_filename, cv::InputArray lut)
   :
     m_use_ocl(true)
@@ -92,11 +93,14 @@ BlobDetector::BlobDetector(const std::string& ocl_kernel_filename, cv::InputArra
   m_main_queue.create(ocl_context, ocl_device);
   m_thread_count = ocl_device.maxWorkGroupSize();
 }
+//}
 
+/* set_drcfg() method //{ */
 void BlobDetector::set_drcfg(const drcfg_t& drcfg)
 {
   m_drcfg = drcfg;
 }
+//}
 
 /* BlobDetector::load_ocl_kernel() method //{ */
 
