@@ -69,7 +69,7 @@ namespace object_detect
       void preprocess_image(cv::Mat& inout_img) const;
       cv::Mat binarize_image(cv::Mat hsv_img, cv::Mat lab_img, const SegConf& seg_conf) const;
       void binarize_image(cv::InputArray label_img, const uint8_t label, cv::OutputArray bin_img);
-      void postprocess_binary_image(cv::Mat binary_img, const SegConf& seg_conf) const;
+      void postprocess_binary_image(cv::Mat binary_img) const;
       std::vector<Blob> find_blobs(const cv::Mat binary_image, const lut_elem_t color_label) const;
       bool segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, cv::InputArray p_labels, cv::OutputArray p_bin_imgs, cv::OutputArray p_labels_img);
       bool segment_image_ocl(cv::InputArray p_in_img, cv::InputArray p_lut, cv::InputArray p_labels, cv::OutputArray p_bin_imgs, cv::OutputArray p_labels_img);

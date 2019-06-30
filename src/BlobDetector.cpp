@@ -291,22 +291,16 @@ std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<Seg
   bool ocl_success = false;
   if (m_use_ocl)
     ocl_success = segment_image_ocl(in_img, m_lut, labels, bin_imgs, p_labels_img);
-  /* if (m_use_ocl) */
-  /*   ocl_success = segment_image_ocl(in_img, lut, p_labels_img); */
   if (!ocl_success)
-    segment_image(in_img, m_lut, p_labels_img);
-  cv::Mat labels_img = p_labels_img.getMat();
+    segment_image(in_img, m_lut, labels, bin_imgs, p_labels_img);
 
   m_t_segment = ros::WallTime::now();
 
   for (size_t it = 0; it < seg_confs.size(); it++)
   {
     const auto& seg_conf = seg_confs.at(it);
-    cv::Mat binary_img;
-    if (m_use_ocl)
-      binary_img = bin_imgs(cv::Rect(it*in_img.cols*in_img.rows, 0, in_img.cols*in_img.rows, 1)).reshape(0, in_img.rows);
-    else
-      binary_img = binarize_image(labels_img, seg_conf);
+    cv::Mat binary_img = bin_imgs(cv::Rect(it*in_img.cols*in_img.rows, 0, in_img.cols*in_img.rows, 1)).reshape(0, in_img.rows);
+    postprocess_binary_image(binary_img);
     const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
   }
@@ -350,9 +344,10 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
 
   for (const auto& seg_conf : seg_confs)
   {
-    const cv::Mat binary_img = binarize_image(hsv_img, lab_img, seg_conf);
-    if (binary_img.empty())
+    cv::Mat binary_img = binarize_image(hsv_img, lab_img, seg_conf);
+    if (binary_img.empty()) // in case of invalid binarization method (shouldn't happen)
       continue;
+    postprocess_binary_image(binary_img);
     const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
     if (label_img.needed())
@@ -365,18 +360,9 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
 }
 //}
 
-/* BlobDetector::binarize_image() method //{ */
-cv::Mat BlobDetector::binarize_image(cv::Mat label_img, const SegConf& seg_conf)
+/* postprocess_binary_image() method //{ */
+void BlobDetector::postprocess_binary_image(cv::Mat binary_img) const
 {
-  cv::Scalar color_label(seg_conf.color);
-  cv::Mat binary_img;
-  bool ocl_success = false;
-  if (m_use_ocl)
-    ocl_success = bitwise_and_ocl(seg_conf.color, label_img, binary_img);
-  if (!ocl_success)
-    cv::bitwise_and(label_img, color_label, binary_img);
-
-  /* Preprocess the binary image (fill holes) //{ */
   // fill holes in the image
   switch (m_drcfg.fill_holes)
   {
@@ -402,9 +388,6 @@ cv::Mat BlobDetector::binarize_image(cv::Mat label_img, const SegConf& seg_conf)
       break;
     }
   }
-  //}
-
-  return binary_img;
 }
 //}
 
@@ -424,34 +407,6 @@ cv::Mat BlobDetector::binarize_image(cv::Mat hsv_img, cv::Mat lab_img, const Seg
       ROS_ERROR("[BlobDetector]: unknown binarization method selected - cannot perform detection!");
       return binary_img;
   }
-
-  /* Preprocess the binary image (fill holes) //{ */
-  // fill holes in the image
-  switch (m_drcfg.fill_holes)
-  {
-    case 0:  // none
-      break;
-    case 1:  // using findContours
-    {
-      vector<vector<cv::Point>> contours;
-      cv::findContours(binary_img, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
-      cv::drawContours(binary_img, contours, -1, cv::Scalar(255), CV_FILLED, LINE_8);
-      break;
-    }
-    case 2:  // using convexHull
-    {
-      vector<vector<cv::Point>> contours;
-      cv::findContours(binary_img, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
-      for (const auto& contour : contours)
-      {
-        vector<vector<cv::Point>> cx_hull(1);
-        cv::convexHull(contour, cx_hull.at(0), false, true);
-        cv::drawContours(binary_img, cx_hull, 0, cv::Scalar(255), CV_FILLED, LINE_8);
-      }
-      break;
-    }
-  }
-  //}
 
   return binary_img;
 }
@@ -603,9 +558,10 @@ class parallelSegment : public ParallelLoopBody
 //}
 
 /* BlobDetector::segment_image() method //{ */
-bool BlobDetector::segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, cv::OutputArray p_labels_img) const
+bool BlobDetector::segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, cv::InputArray p_labels, cv::OutputArray p_bin_imgs, cv::OutputArray p_labels_img)
 {
   const cv::Mat in_img = p_in_img.getMat();
+  const int in_img_len = in_img.cols*in_img.rows;
   const cv::Mat lut = p_lut.getMat();
   p_labels_img.create(in_img.size(), CV_8UC1);
   cv::Mat labels_img = p_labels_img.getMat();
@@ -633,6 +589,26 @@ bool BlobDetector::segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, 
     /*   dptr[j] = lookup_lut(lut, cur_r, cur_g, cur_b); */
     /* } */
   }
+
+  cv::Mat labels = p_labels.getMat();
+  const int labels_len = labels.cols;
+
+  const cv::Size out_size(in_img_len*labels_len, 1);
+  p_bin_imgs.create(out_size, CV_8UC1);
+  cv::Mat bin_imgs = p_bin_imgs.getMat();
+
+  for (int it = 0; it < labels_len; it++)
+  {
+    uint8_t color = labels.at<uint8_t>(it);
+    const cv::Rect roi(it*in_img_len, 0, in_img_len, 1);
+    cv::Mat binary_img = bin_imgs(roi).reshape(0, in_img.rows);
+    bool ocl_success = false;
+    if (m_use_ocl)
+      ocl_success = bitwise_and_ocl(color, p_labels_img, binary_img);
+    if (!ocl_success)
+      cv::bitwise_and(p_labels_img, cv::Scalar(color), binary_img);
+  }
+
   return true;
 }
 //}
@@ -641,7 +617,8 @@ bool BlobDetector::segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, 
 bool BlobDetector::bitwise_and_ocl(uint8_t value, cv::InputArray p_in_img, cv::OutputArray p_out_img)
 {
   cv::UMat in_img = p_in_img.getUMat();
-  p_out_img.create(in_img.size(), in_img.type());
+  if (p_out_img.empty())
+    p_out_img.create(in_img.size(), in_img.type());
   cv::UMat out_img = p_out_img.getUMat();
   // ensure all matrices are continuous
   if (!in_img.isContinuous())
