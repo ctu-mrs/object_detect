@@ -630,14 +630,17 @@ bool BlobDetector::bitwise_and_ocl(uint8_t value, cv::InputArray p_in_img, cv::O
   int ki = 0;
   ki = m_ocl_bitwise_and_kernel.set(ki, value);
   ki = m_ocl_bitwise_and_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(in_img));
-  ki = m_ocl_bitwise_and_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(out_img));
+  if (out_img.empty()) // avoid pointer problems by providing a dummy 1x1 matrix (which is not used)
+    ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(cv::UMat(cv::Size(1, 1), CV_8UC1)));
+  else
+    ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(out_img));
   
   constexpr int dims = 1;
   size_t globalsize[dims] = {(size_t)in_img.cols*(size_t)in_img.rows};
 
   bool success = m_ocl_bitwise_and_kernel.run(dims, globalsize, nullptr, true, m_main_queue);
   if (!success)
-    ROS_ERROR("[BlobDetector]: Failed running kernel!");
+    ROS_ERROR("[BlobDetector]: Failed running kernel \"bitwise_and\"!");
   return success;
 }
 //}
@@ -673,14 +676,20 @@ bool BlobDetector::segment_image_ocl(cv::InputArray p_in_img, cv::InputArray p_l
   }
 
   int ki = 0;
-  ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(labels));
+  if (labels.empty()) // avoid pointer problems by providing a dummy 1x1 matrix (which is not used)
+    ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(cv::UMat(cv::Size(1, 1), CV_8UC1)));
+  else
+    ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(labels));
   ki = m_ocl_seg_kernel.set(ki, (int)labels_len);
   ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(in_img));
   ki = m_ocl_seg_kernel.set(ki, (int)in_img_len);
   ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrReadOnly(lut));
   ki = m_ocl_seg_kernel.set(ki, (int)lut_dim);
   ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(labels_img));
-  ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(bin_imgs));
+  if (bin_imgs.empty()) // avoid pointer problems by providing a dummy 1x1 matrix (which is not used)
+    ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(cv::UMat(cv::Size(1, 1), CV_8UC1)));
+  else
+    ki = m_ocl_seg_kernel.set(ki, cv::ocl::KernelArg::PtrWriteOnly(bin_imgs));
   
   constexpr int dims = 1;
   size_t globalsize[dims] = {(size_t)in_img_len};
@@ -691,7 +700,7 @@ bool BlobDetector::segment_image_ocl(cv::InputArray p_in_img, cv::InputArray p_l
   ros::WallTime end = ros::WallTime::now();
   ROS_INFO("[BlobDetector]: OpenCL runtime: %.2f", (end-start).toSec()*1000.0);
   if (!success)
-    ROS_ERROR("[BlobDetector]: Failed running kernel!");
+    ROS_ERROR("[BlobDetector]: Failed running kernel \"segmentation\"!");
 
   return success;
 }

@@ -9,7 +9,7 @@ __kernel void bitwise_and(
   out_ptr[it] = src & value;
 }
 
-__kernel void lut_lookup(
+void lut_lookup(
     const int lut_dim,
     __global const uchar* src_ptr,
     __global const uchar* lut_ptr,
