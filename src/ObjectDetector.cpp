@@ -699,7 +699,8 @@ namespace object_detect
     std::string segment_color_text = pl.load_param2<std::string>("segment_color_text");
     drcfg_t drcfg = m_drmgr_ptr->config;
     drcfg.segment_color = color_id(segment_color_text);
-    m_drmgr_ptr->update_config(drcfg);
+    m_drmgr_ptr->config = drcfg;
+    m_drmgr_ptr->update_config();
 
     if (!m_drmgr_ptr->loaded_successfully())
     {
