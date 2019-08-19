@@ -725,7 +725,8 @@ namespace object_detect
     m_sh_rgb = smgr.create_handler_threadsafe<sensor_msgs::ImageConstPtr>("rgb_image", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
     m_sh_rgb_cinfo = smgr.create_handler_threadsafe<sensor_msgs::CameraInfo>("rgb_camera_info", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
   
-    m_pub_debug = nh.advertise<sensor_msgs::Image&>("debug_image", 1);
+    image_transport::ImageTransport it(nh);
+    m_pub_debug = it.advertise("debug_image", 1);
     m_pub_pcl = nh.advertise<sensor_msgs::PointCloud>("detected_objects_pcl", 10);
     m_pub_det = nh.advertise<object_detect::PoseWithCovarianceArrayStamped>("detected_objects", 10);
 

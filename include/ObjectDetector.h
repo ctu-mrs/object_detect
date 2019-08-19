@@ -214,7 +214,7 @@ namespace object_detect
 
       ros::Publisher m_pub_det;
       ros::Publisher m_pub_pcl;
-      ros::Publisher m_pub_debug;
+      image_transport::Publisher m_pub_debug;
 
       ros::ServiceServer m_color_change_server;
       ros::ServiceServer m_color_query_server;
