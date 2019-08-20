@@ -17,14 +17,14 @@
   <arg name="depthmap_cinfo" value="rs_d435/aligned_depth_to_color/camera_info"/>
 
   <arg name="standalone" default="true" />
-  <arg name="manager" default="detection_nodelet_manager" />
+  <arg name="manager" default="object_detect_nodelet_manager" />
   <arg name="nodelet_name" value="object_detect/ObjectDetector" />
   <arg unless="$(arg standalone)" name="nodelet_load" value="load $(arg nodelet_name) $(arg manager)"/>
   <arg     if="$(arg standalone)" name="nodelet_load" value="standalone $(arg nodelet_name)"/>
 
   <group ns="$(arg uav_name)">
 
-    <node pkg="nodelet" type="nodelet" name="object_detect" args="standalone object_detect/ObjectDetector" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" >
+    <node pkg="nodelet" type="nodelet" name="object_detect" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" >
       
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
