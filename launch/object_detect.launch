@@ -24,7 +24,7 @@
 
   <group ns="$(arg uav_name)">
 
-    <node pkg="nodelet" type="nodelet" name="object_detect" args="standalone object_detect/ObjectDetector" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile)" >
+    <node pkg="nodelet" type="nodelet" name="object_detect" args="standalone object_detect/ObjectDetector" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" >
       
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
