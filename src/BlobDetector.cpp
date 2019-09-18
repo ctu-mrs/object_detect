@@ -277,7 +277,7 @@ void BlobDetector::preprocess_image(cv::Mat& inout_img) const
 }
 //}
 
-/* BlobDetector::detect() method //{ */
+/* BlobDetector::detect_lut() method //{ */
 std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray p_labels_img)
 {
 #ifdef ENABLE_PROFILING
@@ -326,11 +326,12 @@ std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<Seg
 //}
 
 /* BlobDetector::detect() method //{ */
-std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray label_img)
+std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray p_labels_img)
 {
   std::vector<Blob> blobs;
   preprocess_image(in_img);
-  const cv::Mat labels_img = cv::Mat(in_img.size(), CV_8UC1, cv::Scalar(0));
+  p_labels_img.create(in_img.size(), CV_8UC1);
+  p_labels_img.setTo(0);
 
   cv::Mat hsv_img;
   {
@@ -347,7 +348,7 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
     for (const auto& seg_conf : seg_confs)
       use_lab = use_lab || seg_conf.method == bin_method_t::lab;
     if (use_lab)
-    cv::cvtColor(in_img, lab_img, cv::COLOR_BGR2Lab);
+      cv::cvtColor(in_img, lab_img, cv::COLOR_BGR2Lab);
   }
 
   for (const auto& seg_conf : seg_confs)
@@ -358,10 +359,10 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
     postprocess_binary_image(binary_img);
     const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
-    if (label_img.needed())
+    if (p_labels_img.needed())
     {
       const cv::Mat tmp_img = binary_img/255*seg_conf.color;
-      cv::bitwise_or(labels_img, tmp_img, labels_img);
+      cv::bitwise_or(p_labels_img, tmp_img, p_labels_img);
     }
   }
   return blobs;
@@ -631,7 +632,7 @@ bool BlobDetector::bitwise_and_ocl(uint8_t value, cv::InputArray p_in_img, cv::O
   // ensure all matrices are continuous
   if (!in_img.isContinuous())
   {
-    ROS_ERROR("[BlobDetector::segment_image_ocl]: Input image must be continuous! Skipping.");
+    ROS_ERROR("[BlobDetector::bitwise_and_ocl]: Input image must be continuous! Skipping.");
     return false;
   }
 

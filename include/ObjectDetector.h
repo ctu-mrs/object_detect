@@ -132,6 +132,16 @@ namespace object_detect
       return binname2id.at(name);
   }
 
+  std::string binarization_method_name(bin_method_t id)
+  {
+    for (const auto& keyval : binname2id)
+    {
+      if (keyval.second == id)
+        return keyval.first;
+    }
+    return "unknown";
+  }
+
   dist_qual_t dist_qual_id(std::string name)
   {
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);

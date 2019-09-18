@@ -9,8 +9,6 @@
   <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
   <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
 
-  <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml"/>
-
   <arg name="color_image" value="rs_d435/color/image_rect_color"/>
   <arg name="color_cinfo" value="rs_d435/color/camera_info"/>
   <arg name="depthmap_image" value="rs_d435/aligned_depth_to_color/image_raw"/>
@@ -26,16 +24,11 @@
 
     <node pkg="nodelet" type="nodelet" name="object_detect" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" >
       
-      <rosparam file="$(arg world_file)" />
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
       <param name="uav_name" value="$(arg uav_name)" />
 
       <param name="ocl_lut_kernel_file" value="$(find object_detect)/src/ocl_lut_kernel.cl" />
       <param name="colors" command="bash $(find object_detect)/scripts/load_colors.sh '$(find object_detect)/config/colors' '/$(arg uav_name)/object_detect'" />
-      <!-- <rosparam file="$(find object_detect)/config/colors/Red.yaml" /> -->
-      <!-- <rosparam file="$(find object_detect)/config/colors/Green.yaml" /> -->
-      <!-- <rosparam file="$(find object_detect)/config/colors/Blue.yaml" /> -->
-      <!-- <rosparam file="$(find object_detect)/config/colors/Yellow.yaml" /> -->
 
       <remap from="~dm_image" to="$(arg depthmap_image)" />
       <remap from="~dm_camera_info" to="$(arg depthmap_cinfo)" />

@@ -72,7 +72,7 @@ namespace object_detect
           m_prev_color_id = m_drmgr_ptr->config.segment_color;
         }
         for (const auto& seg_conf : m_active_seg_confs)
-          NODELET_INFO("[ObjectDetector]: Segmenting %s color", color_name(seg_conf.color).c_str());
+          NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)", color_name(seg_conf.color).c_str(), binarization_method_name(seg_conf.method).c_str());
         m_blob_det.set_drcfg(m_drmgr_ptr->config);
         if (m_drmgr_ptr->config.override_settings)
         {
