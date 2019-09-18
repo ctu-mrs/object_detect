@@ -720,21 +720,15 @@ namespace object_detect
     m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(m_tf_buffer, m_node_name);
     // Initialize other subs and pubs
     SubscribeMgr smgr(nh);
-    m_sh_dm = smgr.create_handler_threadsafe<sensor_msgs::ImageConstPtr>("dm_image", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
-    m_sh_dm_cinfo = smgr.create_handler_threadsafe<sensor_msgs::CameraInfo>("dm_camera_info", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
-    m_sh_rgb = smgr.create_handler_threadsafe<sensor_msgs::ImageConstPtr>("rgb_image", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
-    m_sh_rgb_cinfo = smgr.create_handler_threadsafe<sensor_msgs::CameraInfo>("rgb_camera_info", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
+    m_sh_dm = smgr.create_handler<sensor_msgs::ImageConstPtr>("dm_image", ros::Duration(5.0));
+    m_sh_dm_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("dm_camera_info", ros::Duration(5.0));
+    m_sh_rgb = smgr.create_handler<sensor_msgs::ImageConstPtr>("rgb_image", ros::Duration(5.0));
+    m_sh_rgb_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("rgb_camera_info", ros::Duration(5.0));
   
     image_transport::ImageTransport it(nh);
     m_pub_debug = it.advertise("debug_image", 1);
     m_pub_pcl = nh.advertise<sensor_msgs::PointCloud>("detected_objects_pcl", 10);
     m_pub_det = nh.advertise<object_detect::PoseWithCovarianceArrayStamped>("detected_objects", 10);
-
-    if (!smgr.loaded_successfully())
-    {
-      ROS_ERROR("Unable to subscribe to some topics, ending the node");
-      ros::shutdown();
-    }
 
     m_color_change_server = nh.advertiseService("change_colors", &ObjectDetector::color_change_callback, this);
     m_color_query_server = nh.advertiseService("query_colors", &ObjectDetector::color_query_callback, this);

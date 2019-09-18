@@ -20,7 +20,7 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <mrs_lib/ParamLoader.h>
-#include <mrs_lib/SubscribeHandler.h>
+#include <mrs_lib/subscribe_handler.h>
 #include "SegConf.h"
 
 using namespace cv;
@@ -128,26 +128,14 @@ int main(int argc, char** argv)
     }
   }
 
-  mrs_lib::SubscribeHandlerPtr<sensor_msgs::PointCloudConstPtr> sh_pc;
-  mrs_lib::SubscribeHandlerPtr<sensor_msgs::ImageConstPtr> sh_img;
-  mrs_lib::SubscribeHandlerPtr<sensor_msgs::CameraInfo> sh_cinfo;
-  mrs_lib::SubscribeHandlerPtr<geometry_msgs::PointStamped> sh_ball;
-
   mrs_lib::SubscribeMgr smgr(nh, "backproject_display");
-  const bool subs_time_consistent = false;
-  sh_pc = smgr.create_handler_threadsafe<sensor_msgs::PointCloudConstPtr, subs_time_consistent>("detections", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
-  sh_img = smgr.create_handler_threadsafe<sensor_msgs::ImageConstPtr, subs_time_consistent>("image_rect", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
-  sh_cinfo = smgr.create_handler_threadsafe<sensor_msgs::CameraInfo, subs_time_consistent>("camera_info", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
-  sh_ball = smgr.create_handler_threadsafe<geometry_msgs::PointStamped, subs_time_consistent>("chosen_balloon", 1, ros::TransportHints().tcpNoDelay(), ros::Duration(5.0));
+  auto sh_pc = smgr.create_handler<sensor_msgs::PointCloudConstPtr>("detections", ros::Duration(5.0));
+  auto sh_img = smgr.create_handler<sensor_msgs::ImageConstPtr>("image_rect", ros::Duration(5.0));
+  auto sh_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("camera_info", ros::Duration(5.0));
+  auto sh_ball = smgr.create_handler<geometry_msgs::PointStamped>("chosen_balloon", ros::Duration(5.0));
 
   tf2_ros::Buffer tf_buffer;
   tf2_ros::TransformListener tf_listener(tf_buffer);
-
-  if (!smgr.loaded_successfully())
-  {
-    ROS_ERROR("Failed to subscribe some topics");
-    ros::shutdown();
-  }
 
   print_options();
 
