@@ -720,9 +720,9 @@ namespace object_detect
     m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(m_tf_buffer, m_node_name);
     // Initialize other subs and pubs
     SubscribeMgr smgr(nh);
-    m_sh_dm = smgr.create_handler<sensor_msgs::ImageConstPtr>("dm_image", ros::Duration(5.0));
+    m_sh_dm = smgr.create_handler<sensor_msgs::Image>("dm_image", ros::Duration(5.0));
     m_sh_dm_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("dm_camera_info", ros::Duration(5.0));
-    m_sh_rgb = smgr.create_handler<sensor_msgs::ImageConstPtr>("rgb_image", ros::Duration(5.0));
+    m_sh_rgb = smgr.create_handler<sensor_msgs::Image>("rgb_image", ros::Duration(5.0));
     m_sh_rgb_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("rgb_camera_info", ros::Duration(5.0));
   
     image_transport::ImageTransport it(nh);

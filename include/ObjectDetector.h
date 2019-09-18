@@ -207,9 +207,9 @@ namespace object_detect
       tf2_ros::Buffer m_tf_buffer;
       std::unique_ptr<tf2_ros::TransformListener> m_tf_listener_ptr;
 
-      mrs_lib::SubscribeHandlerPtr<sensor_msgs::ImageConstPtr> m_sh_dm;
+      mrs_lib::SubscribeHandlerPtr<sensor_msgs::Image> m_sh_dm;
       mrs_lib::SubscribeHandlerPtr<sensor_msgs::CameraInfo> m_sh_dm_cinfo;
-      mrs_lib::SubscribeHandlerPtr<sensor_msgs::ImageConstPtr> m_sh_rgb;
+      mrs_lib::SubscribeHandlerPtr<sensor_msgs::Image> m_sh_rgb;
       mrs_lib::SubscribeHandlerPtr<sensor_msgs::CameraInfo> m_sh_rgb_cinfo;
 
       ros::Publisher m_pub_det;

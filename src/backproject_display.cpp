@@ -129,8 +129,8 @@ int main(int argc, char** argv)
   }
 
   mrs_lib::SubscribeMgr smgr(nh, "backproject_display");
-  auto sh_pc = smgr.create_handler<sensor_msgs::PointCloudConstPtr>("detections", ros::Duration(5.0));
-  auto sh_img = smgr.create_handler<sensor_msgs::ImageConstPtr>("image_rect", ros::Duration(5.0));
+  auto sh_pc = smgr.create_handler<sensor_msgs::PointCloud>("detections", ros::Duration(5.0));
+  auto sh_img = smgr.create_handler<sensor_msgs::Image>("image_rect", ros::Duration(5.0));
   auto sh_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("camera_info", ros::Duration(5.0));
   auto sh_ball = smgr.create_handler<geometry_msgs::PointStamped>("chosen_balloon", ros::Duration(5.0));
 
@@ -225,7 +225,7 @@ int main(int argc, char** argv)
 
         if (sh_ball->new_data())
         {
-          geometry_msgs::PointStamped pt = sh_ball->get_data();
+          geometry_msgs::PointStamped pt = *(sh_ball->get_data());
           geometry_msgs::TransformStamped transform;
           bool got_transform = true;
           try
