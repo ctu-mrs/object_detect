@@ -163,10 +163,10 @@ int main(int argc, char** argv)
     if (sh_img->has_data() && sh_cinfo->used_data())
     {
       cv::Mat img;
-      if (sh_pc->has_data())
+      if (sh_ball->has_data())
       {
-        ros::Time cur_det_t = sh_pc->get_data()->header.stamp;
-        sensor_msgs::PointCloudConstPtr dets_msg = sh_pc->get_data();
+        ros::Time cur_det_t = sh_ball->get_data()->header.stamp;
+        const auto dets_msg = sh_ball->get_data();
         sensor_msgs::ImageConstPtr img_ros = find_closest(cur_det_t, img_buffer);
 
         geometry_msgs::TransformStamped transform;
@@ -183,21 +183,21 @@ int main(int argc, char** argv)
         img = img_ros2->image;
         /* cv::cvtColor(img, img, cv::COLOR_BGR2GRAY); */
         /* cv::cvtColor(img, img, cv::COLOR_GRAY2BGR); */
-        size_t channel_quality_it = get_dist_qual_channel(dets_msg);
-        if (channel_quality_it < 0)
-          ROS_WARN("distance_quality channel not found");
+        /* size_t channel_quality_it = get_dist_qual_channel(dets_msg); */
+        /* if (channel_quality_it < 0) */
+        /*   ROS_WARN("distance_quality channel not found"); */
 
-        for (size_t it = 0; it < dets_msg->points.size(); it++)
+        /* for (size_t it = 0; it < dets_msg->points.size(); it++) */
         {
           cv::Point prev_pt2d;
           cv::Point3d pt3d;
           cv::Scalar color;
 
-          const geometry_msgs::Point32& point_float = dets_msg->points[it];
-          geometry_msgs::Point point_orig;
-          point_orig.x = point_float.x; point_orig.y = point_float.y; point_orig.z = point_float.z;
+          /* const geometry_msgs::Point32& point_float = dets_msg->points[it]; */
+          /* geometry_msgs::Point point_orig; */
+          /* point_orig.x = point_float.x; point_orig.y = point_float.y; point_orig.z = point_float.z; */
           geometry_msgs::Point point_transformed;
-          tf2::doTransform(point_orig, point_transformed, transform);
+          tf2::doTransform(dets_msg->pose.pose.position, point_transformed, transform);
         
           pt3d.x = point_transformed.x;
           pt3d.y = point_transformed.y;
@@ -221,41 +221,41 @@ int main(int argc, char** argv)
             const cv::Point lo = prev_pt2d + cv::Point(45, -45);
             if (show_distance)
               cv::putText(img, "distance:   " + to_str_prec(dist) + "m", lo+cv::Point(0, li++*ls), FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
-            if (show_dist_quality)
-              cv::putText(img, "dist. qual: " + to_str_prec(dets_msg->channels[channel_quality_it].values.at(it)), lo+cv::Point(0, li++*ls), FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
+            /* if (show_dist_quality) */
+            /*   cv::putText(img, "dist. qual: " + to_str_prec(dets_msg->channels[channel_quality_it].values.at(it)), lo+cv::Point(0, li++*ls), FONT_HERSHEY_SIMPLEX, 0.5, color, 1); */
             /* if (show_dist_quality) */
             /*   cv::putText(img, "distance: " + to_str_prec(dist) + "m", lo+cv::Point(0, li++*ls), FONT_HERSHEY_SIMPLEX, 0.5, color, 1); */
           }
         } // for (const auto& hyp_msg : hyps_msg.hypotheses)
 
-        if (sh_ball->new_data())
-        {
-          geometry_msgs::PoseWithCovarianceStamped pt = *(sh_ball->get_data());
-          geometry_msgs::TransformStamped transform;
-          bool got_transform = true;
-          try
-          {
-            transform = tf_buffer.lookupTransform(img_ros->header.frame_id, pt.header.frame_id, pt.header.stamp, ros::Duration(1.0));
-          } catch (tf2::TransformException& ex)
-          {
-            ROS_WARN("Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", pt.header.frame_id.c_str(), img_ros->header.frame_id.c_str(), ex.what());
-            got_transform = false;
-          }
-          if (got_transform)
-          {
-            geometry_msgs::Point point_transformed;
-            tf2::doTransform(pt.pose.pose.position, point_transformed, transform);
+        /* if (sh_ball->new_data()) */
+        /* { */
+        /*   geometry_msgs::PoseWithCovarianceStamped pt = *(sh_ball->get_data()); */
+        /*   geometry_msgs::TransformStamped transform; */
+        /*   bool got_transform = true; */
+        /*   try */
+        /*   { */
+        /*     transform = tf_buffer.lookupTransform(img_ros->header.frame_id, pt.header.frame_id, pt.header.stamp, ros::Duration(1.0)); */
+        /*   } catch (tf2::TransformException& ex) */
+        /*   { */
+        /*     ROS_WARN("Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", pt.header.frame_id.c_str(), img_ros->header.frame_id.c_str(), ex.what()); */
+        /*     got_transform = false; */
+        /*   } */
+        /*   if (got_transform) */
+        /*   { */
+        /*     geometry_msgs::Point point_transformed; */
+        /*     tf2::doTransform(pt.pose.pose.position, point_transformed, transform); */
 
-            cv::Point prev_pt2d;
-            cv::Point3d pt3d;
-            pt3d.x = point_transformed.x;
-            pt3d.y = point_transformed.y;
-            pt3d.z = point_transformed.z;
-            const cv::Point pt2d = camera_model.project3dToPixel(pt3d);
-            cv::circle(img, pt2d, 5, cv::Scalar(0, 0, 255), -1);
-          }
-        }
-      } else // if (sh_pc->has_data())
+        /*     cv::Point prev_pt2d; */
+        /*     cv::Point3d pt3d; */
+        /*     pt3d.x = point_transformed.x; */
+        /*     pt3d.y = point_transformed.y; */
+        /*     pt3d.z = point_transformed.z; */
+        /*     const cv::Point pt2d = camera_model.project3dToPixel(pt3d); */
+        /*     cv::circle(img, pt2d, 5, cv::Scalar(0, 0, 255), -1); */
+        /*   } */
+        /* } */
+      } else // if (sh_ball->has_data())
       {
         sensor_msgs::ImageConstPtr img_ros = img_buffer.back();
         cv_bridge::CvImageConstPtr img_ros2 = cv_bridge::toCvShare(img_ros, "bgr8");

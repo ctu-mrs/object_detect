@@ -24,7 +24,7 @@
       <!-- <rosparam file="$(find object_detect)/config/colors/Green.yaml" /> -->
       <!-- <rosparam file="$(find object_detect)/config/colors/Blue.yaml" /> -->
       <!-- <rosparam file="$(find object_detect)/config/colors/Yellow.yaml" /> -->
-      <remap from="~chosen_balloon" to="balloon_planner/balloon_chosen_out" />
+      <remap from="~chosen_balloon" to="balloon_planner/balloon_detection_used" />
       <remap from="~detections" to="object_detect/detected_objects_pcl" />
       <remap from="~image_rect" to="$(arg color_image)" />
       <remap from="~camera_info" to="$(arg color_cinfo)" />
