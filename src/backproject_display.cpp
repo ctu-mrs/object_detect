@@ -128,11 +128,14 @@ int main(int argc, char** argv)
     }
   }
 
+  mrs_lib::ParamLoader pl(nh);
+  const double object_radius = pl.load_param2<double>("object_radius");
+
   mrs_lib::SubscribeMgr smgr(nh, "backproject_display");
   auto sh_pc = smgr.create_handler<sensor_msgs::PointCloud>("detections", ros::Duration(5.0));
   auto sh_img = smgr.create_handler<sensor_msgs::Image>("image_rect", ros::Duration(5.0));
   auto sh_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("camera_info", ros::Duration(5.0));
-  auto sh_ball = smgr.create_handler<geometry_msgs::PointStamped>("chosen_balloon", ros::Duration(5.0));
+  auto sh_ball = smgr.create_handler<geometry_msgs::PoseWithCovarianceStamped>("chosen_balloon", ros::Duration(5.0));
 
   tf2_ros::Buffer tf_buffer;
   tf2_ros::TransformListener tf_listener(tf_buffer);
@@ -178,6 +181,8 @@ int main(int argc, char** argv)
 
         const cv_bridge::CvImagePtr img_ros2 = cv_bridge::toCvCopy(img_ros, "bgr8");
         img = img_ros2->image;
+        /* cv::cvtColor(img, img, cv::COLOR_BGR2GRAY); */
+        /* cv::cvtColor(img, img, cv::COLOR_GRAY2BGR); */
         size_t channel_quality_it = get_dist_qual_channel(dets_msg);
         if (channel_quality_it < 0)
           ROS_WARN("distance_quality channel not found");
@@ -225,7 +230,7 @@ int main(int argc, char** argv)
 
         if (sh_ball->new_data())
         {
-          geometry_msgs::PointStamped pt = *(sh_ball->get_data());
+          geometry_msgs::PoseWithCovarianceStamped pt = *(sh_ball->get_data());
           geometry_msgs::TransformStamped transform;
           bool got_transform = true;
           try
@@ -239,7 +244,7 @@ int main(int argc, char** argv)
           if (got_transform)
           {
             geometry_msgs::Point point_transformed;
-            tf2::doTransform(pt.point, point_transformed, transform);
+            tf2::doTransform(pt.pose.pose.position, point_transformed, transform);
 
             cv::Point prev_pt2d;
             cv::Point3d pt3d;

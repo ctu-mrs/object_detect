@@ -9,7 +9,7 @@
   <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
   <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
 
-  <arg name="color_image" value="rs_d435/color/image_rect_color"/>
+  <arg name="color_image" value="rs_d435/color/image_raw"/>
   <arg name="color_cinfo" value="rs_d435/color/camera_info"/>
 
   <group ns="$(arg uav_name)">
@@ -25,7 +25,7 @@
       <!-- <rosparam file="$(find object_detect)/config/colors/Blue.yaml" /> -->
       <!-- <rosparam file="$(find object_detect)/config/colors/Yellow.yaml" /> -->
       <remap from="~chosen_balloon" to="balloon_planner/balloon_chosen_out" />
-      <remap from="~detections" to="object_detect/detected_objects" />
+      <remap from="~detections" to="object_detect/detected_objects_pcl" />
       <remap from="~image_rect" to="$(arg color_image)" />
       <remap from="~camera_info" to="$(arg color_cinfo)" />
 
