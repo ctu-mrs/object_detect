@@ -129,7 +129,7 @@ int main(int argc, char** argv)
   }
 
   mrs_lib::ParamLoader pl(nh);
-  const double object_radius = pl.load_param2<double>("object_radius");
+  /* const double object_radius = pl.load_param2<double>("object_radius"); */
 
   mrs_lib::SubscribeMgr smgr(nh, "backproject_display");
   auto sh_pc = smgr.create_handler<sensor_msgs::PointCloud>("detections", ros::Duration(5.0));
