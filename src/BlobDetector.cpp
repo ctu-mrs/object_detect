@@ -69,6 +69,8 @@ BlobDetector::BlobDetector(const std::string& ocl_kernel_filename, cv::InputArra
   :
     m_use_ocl(true)
 {
+  m_lut = lut.getUMat();
+
   const std::string ocl_options = "";
   m_ocl_seg_kernel = load_ocl_kernel(ocl_kernel_filename, "segmentation", ocl_options);
   m_ocl_bitwise_and_kernel = load_ocl_kernel(ocl_kernel_filename, "bitwise_and", ocl_options);
@@ -78,8 +80,6 @@ BlobDetector::BlobDetector(const std::string& ocl_kernel_filename, cv::InputArra
     m_use_ocl = false;
     return;
   }
-
-  m_lut = lut.getUMat();
 
   auto ocl_context = cv::ocl::Context::getDefault(false);
   auto ocl_device = cv::ocl::Device::getDefault();

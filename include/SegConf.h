@@ -21,6 +21,7 @@ namespace object_detect
     blue    = ( 0x01 << 2 ),
     yellow  = ( 0x01 << 3 ),
     orange  = ( 0x01 << 4 ),
+    white   = ( 0x01 << 5 ),
   };
   enum bin_method_t
   {
