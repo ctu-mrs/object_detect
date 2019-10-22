@@ -62,14 +62,16 @@ BlobDetector::BlobDetector(cv::InputArray lut)
   :
     m_use_ocl(false)
 {
-  m_lut = lut.getUMat();
+  lut.copyTo(m_lut);
+  lut.copyTo(m_ulut);
 }
 
 BlobDetector::BlobDetector(const std::string& ocl_kernel_filename, cv::InputArray lut)
   :
     m_use_ocl(true)
 {
-  m_lut = lut.getUMat();
+  lut.copyTo(m_lut);
+  lut.copyTo(m_ulut);
 
   const std::string ocl_options = "";
   m_ocl_seg_kernel = load_ocl_kernel(ocl_kernel_filename, "segmentation", ocl_options);
@@ -296,7 +298,7 @@ std::vector<BallCandidate> BlobDetector::detect_lut(cv::Mat in_img, const std::v
 
   bool ocl_success = false;
   if (m_use_ocl)
-    ocl_success = segment_image_ocl(in_img, m_lut, labels, bin_imgs, p_labels_img);
+    ocl_success = segment_image_ocl(in_img, m_ulut, labels, bin_imgs, p_labels_img);
   if (!ocl_success)
     segment_image(in_img, m_lut, labels, bin_imgs, p_labels_img);
 
@@ -546,7 +548,7 @@ cv::Mat BlobDetector::threshold_lab(cv::Mat lab_img, const SegConfPtr seg_conf) 
 class parallelSegment : public ParallelLoopBody
 {
   public:
-      parallelSegment(const uint8_t* sptr, uint8_t* dptr, const lut_t& lut)
+      parallelSegment(const uint8_t* sptr, uint8_t* dptr, cv::InputArray lut)
         : sptr(sptr), dptr(dptr), lut(lut)
       {
       }
@@ -565,7 +567,7 @@ class parallelSegment : public ParallelLoopBody
   private:
       const uint8_t* sptr;
       uint8_t* dptr;
-      const lut_t& lut;
+      cv::InputArray lut;
 };
 
 //}
@@ -575,7 +577,6 @@ bool BlobDetector::segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, 
 {
   const cv::Mat in_img = p_in_img.getMat();
   const int in_img_len = in_img.cols*in_img.rows;
-  const cv::Mat lut = p_lut.getMat();
   p_labels_img.create(in_img.size(), CV_8UC1);
   cv::Mat labels_img = p_labels_img.getMat();
   Size size = in_img.size();
@@ -593,13 +594,13 @@ bool BlobDetector::segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, 
     // the outer loop is executed only once
     const uint8_t* const sptr_row = in_img.ptr<uint8_t>(i);
     uint8_t* dptr = labels_img.ptr<uint8_t>(i);
-    parallel_for_(Range(0, size.width), parallelSegment(sptr_row, dptr, lut));
+    parallel_for_(Range(0, size.width), parallelSegment(sptr_row, dptr, p_lut));
     /* for (int j = 0; j < size.width; j++) */
     /* { */
-    /*   const uint8_t cur_b = sptr[3 * j + 0]; */
-    /*   const uint8_t cur_g = sptr[3 * j + 1]; */
-    /*   const uint8_t cur_r = sptr[3 * j + 2]; */
-    /*   dptr[j] = lookup_lut(lut, cur_r, cur_g, cur_b); */
+    /*   const uint8_t cur_b = sptr_row[3 * j + 0]; */
+    /*   const uint8_t cur_g = sptr_row[3 * j + 1]; */
+    /*   const uint8_t cur_r = sptr_row[3 * j + 2]; */
+    /*   dptr[j] = lookup_lut(p_lut, cur_r, cur_g, cur_b); */
     /* } */
   }
 

@@ -47,7 +47,8 @@ namespace object_detect
 
     private:
       drcfg_t m_drcfg;
-      cv::UMat m_lut;
+      cv::Mat m_lut;
+      cv::UMat m_ulut;
 
     private:
       bool m_use_ocl;

@@ -52,7 +52,7 @@ namespace object_detect
   using SegConfPtr = std::shared_ptr<SegConf>;
 
   lut_t generate_lut(const std::vector<SegConfPtr>& seg_confs);
-  lut_elem_t lookup_lut(const lut_t& lut, size_t r, size_t g, size_t b);
+  lut_elem_t lookup_lut(cv::InputArray lut, size_t r, size_t g, size_t b);
 
 }
 

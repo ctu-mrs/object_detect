@@ -648,7 +648,7 @@ namespace object_detect
         ROS_INFO("[%s]: Using OpenCL HW acceleration.", m_node_name.c_str());
       } else
       {
-        m_blob_det = BlobDetector(m_cur_lut);
+        m_blob_det = BlobDetector(lut);
       }
     }
 

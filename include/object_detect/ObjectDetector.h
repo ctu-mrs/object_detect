@@ -191,7 +191,6 @@ namespace object_detect
       bool m_is_initialized;
       BlobDetector m_blob_det;
       int m_prev_color_id;
-      lut_t m_cur_lut;
       std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
       image_geometry::PinholeCameraModel m_dm_camera_model;
       image_geometry::PinholeCameraModel m_rgb_camera_model;
