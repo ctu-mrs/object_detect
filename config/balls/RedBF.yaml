@@ -1,0 +1,7 @@
+redbf:
+  binarization_method: HSV
+  hsv: {hue_center: 4.221714830931543, hue_range: 9.351838948786117, sat_center: 143.06584362139918,
+    sat_range: 60.1566933368341, val_center: 246.4897119341564, val_range: 444.2625306720364}
+  lab: {a_center: 171.46090534979425, a_range: 28.40550413343809, b_center: 159.4897119341564,
+    b_range: 40.65136515710317, l_center: 170.42798353909464, l_range: 203.86546198358707}
+  physical_radius: 0.075

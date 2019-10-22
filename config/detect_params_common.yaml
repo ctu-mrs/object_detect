@@ -1,6 +1,6 @@
 ############### Distance estimation parameters ###############
 colors: [
-  "Red"
+  "RedBF"
   ]
 # distance estimation from object size parameters
 max_dist: 30.0

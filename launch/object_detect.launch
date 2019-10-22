@@ -9,7 +9,7 @@
   <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
   <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
 
-  <arg name="color_image" value="rs_d435/color/image_raw"/>
+  <arg name="color_image" value="/mv_26807157/image_raw"/>
   <arg name="color_cinfo" value="rs_d435/color/camera_info"/>
   <arg name="depthmap_image" value="rs_d435/aligned_depth_to_color/image_raw"/>
   <arg name="depthmap_cinfo" value="rs_d435/aligned_depth_to_color/camera_info"/>
@@ -25,7 +25,7 @@
     <node pkg="nodelet" type="nodelet" name="object_detect" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" >
       
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
-      <rosparam file="$(find object_detect)/config/balls/Red.yaml" />
+      <rosparam file="$(find object_detect)/config/balls/RedBF.yaml" />
       <param name="uav_name" value="$(arg uav_name)" />
 
       <param name="ocl_lut_kernel_file" value="$(find object_detect)/src/ocl_lut_kernel.cl" />
