@@ -278,20 +278,20 @@ void BlobDetector::preprocess_image(cv::Mat& inout_img) const
 //}
 
 /* BlobDetector::detect_lut() method //{ */
-std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray p_labels_img)
+std::vector<BallCandidate> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<BallTypePtr>& ball_types, cv::OutputArray p_labels_img)
 {
 #ifdef ENABLE_PROFILING
   ros::WallTime t_start = ros::WallTime::now();
 #endif
-  std::vector<Blob> blobs;
+  std::vector<BallCandidate> balls;
   preprocess_image(in_img);
 #ifdef ENABLE_PROFILING
   ros::WallTime t_preprocess = ros::WallTime::now();
 #endif
   std::vector<uint8_t> labels;
-  labels.reserve(seg_confs.size());
-  for (const auto& seg_conf : seg_confs)
-    labels.push_back(seg_conf.color_id);
+  labels.reserve(ball_types.size());
+  for (const auto& ball_type : ball_types)
+    labels.push_back(ball_type->seg_conf->color_id);
   cv::Mat bin_imgs;
 
   bool ocl_success = false;
@@ -304,13 +304,15 @@ std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<Seg
   ros::WallTime t_segment = ros::WallTime::now();
 #endif
 
-  for (size_t it = 0; it < seg_confs.size(); it++)
+  for (size_t it = 0; it < ball_types.size(); it++)
   {
-    const auto& seg_conf = seg_confs.at(it);
+    const auto& ball_type = ball_types.at(it);
+    const auto& seg_conf = ball_type->seg_conf;
     cv::Mat binary_img = bin_imgs(cv::Rect(it*in_img.cols*in_img.rows, 0, in_img.cols*in_img.rows, 1)).reshape(0, in_img.rows);
     postprocess_binary_image(binary_img);
-    const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color_id);
-    blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
+    const std::vector<Blob> blobs = find_blobs(binary_img, seg_conf->color_id);
+    const auto cur_balls = blobs_to_balls(blobs, ball_type);
+    balls.insert(std::end(balls), std::begin(cur_balls), std::end(cur_balls)); 
   }
 #ifdef ENABLE_PROFILING
   ros::WallTime t_finish = ros::WallTime::now();
@@ -321,14 +323,14 @@ std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<Seg
   const double total_ms = (m_t_finish - t_start).toSec()*1000.0;
   ROS_INFO("[BlobDetector]: profiling%s\n\tpreproc:\t%.2f\n\tsegment:\t%.2f\n\tfblobs:\t%.2f\n\tfinish:%.2f\n\ttotal:%.2f", ocl_str.c_str(), preproc_ms, segment_ms, fblobs_ms, finish_ms, total_ms);
 #endif
-  return blobs;
+  return balls;
 }
 //}
 
 /* BlobDetector::detect() method //{ */
-std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf>& seg_confs, cv::OutputArray p_labels_img)
+std::vector<BallCandidate> BlobDetector::detect(cv::Mat in_img, const std::vector<BallTypePtr>& ball_types, cv::OutputArray p_labels_img)
 {
-  std::vector<Blob> blobs;
+  std::vector<BallCandidate> balls;
   preprocess_image(in_img);
   p_labels_img.create(in_img.size(), CV_8UC1);
   p_labels_img.setTo(0);
@@ -336,8 +338,8 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
   cv::Mat hsv_img;
   {
     bool use_hsv = false;
-    for (const auto& seg_conf : seg_confs)
-      use_hsv = use_hsv || seg_conf.method == bin_method_t::hsv;
+    for (const auto& ball_type : ball_types)
+      use_hsv = use_hsv || ball_type->seg_conf->method == bin_method_t::hsv;
     if (use_hsv)
       cv::cvtColor(in_img, hsv_img, cv::COLOR_BGR2HSV);
   }
@@ -345,27 +347,29 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
   cv::Mat lab_img;
   {
     bool use_lab = false;
-    for (const auto& seg_conf : seg_confs)
-      use_lab = use_lab || seg_conf.method == bin_method_t::lab;
+    for (const auto& ball_type : ball_types)
+      use_lab = use_lab || ball_type->seg_conf->method == bin_method_t::lab;
     if (use_lab)
       cv::cvtColor(in_img, lab_img, cv::COLOR_BGR2Lab);
   }
 
-  for (const auto& seg_conf : seg_confs)
+  for (const auto& ball_type : ball_types)
   {
+    const auto& seg_conf = ball_type->seg_conf;
     cv::Mat binary_img = binarize_image(hsv_img, lab_img, seg_conf);
     if (binary_img.empty()) // in case of invalid binarization method (shouldn't happen)
       continue;
     postprocess_binary_image(binary_img);
-    const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color_id);
-    blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
+    const std::vector<Blob> blobs = find_blobs(binary_img, seg_conf->color_id);
+    const auto cur_balls = blobs_to_balls(blobs, ball_type);
+    balls.insert(std::end(balls), std::begin(cur_balls), std::end(cur_balls)); 
     if (p_labels_img.needed())
     {
-      const cv::Mat tmp_img = binary_img/255*seg_conf.color_id;
+      const cv::Mat tmp_img = binary_img/255*seg_conf->color_id;
       cv::bitwise_or(p_labels_img, tmp_img, p_labels_img);
     }
   }
-  return blobs;
+  return balls;
 }
 //}
 
@@ -401,10 +405,10 @@ void BlobDetector::postprocess_binary_image(cv::Mat binary_img) const
 //}
 
 /* BlobDetector::binarize_image() method //{ */
-cv::Mat BlobDetector::binarize_image(cv::Mat hsv_img, cv::Mat lab_img, const SegConf& seg_conf) const
+cv::Mat BlobDetector::binarize_image(cv::Mat hsv_img, cv::Mat lab_img, const SegConfPtr seg_conf) const
 {
   cv::Mat binary_img;
-  switch (seg_conf.method)
+  switch (seg_conf->method)
   {
     case bin_method_t::hsv:
       binary_img = threshold_hsv(hsv_img, seg_conf);
@@ -422,10 +426,10 @@ cv::Mat BlobDetector::binarize_image(cv::Mat hsv_img, cv::Mat lab_img, const Seg
 //}
 
 /* BlobDetector::threshold_hsv() method //{ */
-cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img, const SegConf& seg_conf) const
+cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img, const SegConfPtr seg_conf) const
 {
-  double hue_lower = seg_conf.hue_center - seg_conf.hue_range / 2.0;
-  double hue_higher = seg_conf.hue_center + seg_conf.hue_range / 2.0;
+  double hue_lower = seg_conf->hue_center - seg_conf->hue_range / 2.0;
+  double hue_higher = seg_conf->hue_center + seg_conf->hue_range / 2.0;
   bool overflow;
   /* calculate the correct bounds for the pixel HSV values //{ */
   {
@@ -443,11 +447,11 @@ cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img, const SegConf& seg_conf) co
   }
   //}
 
-  double sat_lower = seg_conf.sat_center - seg_conf.sat_range / 2.0;
-  double sat_higher = seg_conf.sat_center + seg_conf.sat_range / 2.0;
+  double sat_lower = seg_conf->sat_center - seg_conf->sat_range / 2.0;
+  double sat_higher = seg_conf->sat_center + seg_conf->sat_range / 2.0;
 
-  double val_lower = seg_conf.val_center - seg_conf.val_range / 2.0;
-  double val_higher = seg_conf.val_center + seg_conf.val_range / 2.0;
+  double val_lower = seg_conf->val_center - seg_conf->val_range / 2.0;
+  double val_higher = seg_conf->val_center + seg_conf->val_range / 2.0;
 
   cv::Mat binary_img;
   // filter the HSV image by color
@@ -488,16 +492,16 @@ cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img, const SegConf& seg_conf) co
 //}
 
 /* BlobDetector::threshold_lab() method //{ */
-cv::Mat BlobDetector::threshold_lab(cv::Mat lab_img, const SegConf& seg_conf) const
+cv::Mat BlobDetector::threshold_lab(cv::Mat lab_img, const SegConfPtr seg_conf) const
 {
-  double l_lower = seg_conf.l_center - seg_conf.l_range / 2.0;
-  double l_higher = seg_conf.l_center + seg_conf.l_range / 2.0;
+  double l_lower = seg_conf->l_center - seg_conf->l_range / 2.0;
+  double l_higher = seg_conf->l_center + seg_conf->l_range / 2.0;
 
-  double a_lower = seg_conf.a_center - seg_conf.a_range / 2.0;
-  double a_higher = seg_conf.a_center + seg_conf.a_range / 2.0;
+  double a_lower = seg_conf->a_center - seg_conf->a_range / 2.0;
+  double a_higher = seg_conf->a_center + seg_conf->a_range / 2.0;
 
-  double b_lower = seg_conf.b_center - seg_conf.b_range / 2.0;
-  double b_higher = seg_conf.b_center + seg_conf.b_range / 2.0;
+  double b_lower = seg_conf->b_center - seg_conf->b_range / 2.0;
+  double b_higher = seg_conf->b_center + seg_conf->b_range / 2.0;
 
   cv::Mat binary_img;
   // filter the Lab image by color
@@ -651,6 +655,23 @@ bool BlobDetector::bitwise_and_ocl(uint8_t value, cv::InputArray p_in_img, cv::O
   if (!success)
     ROS_ERROR("[BlobDetector]: Failed running kernel \"bitwise_and\"!");
   return success;
+}
+//}
+
+/* blobs_to_balls() method //{ */
+std::vector<BallCandidate> BlobDetector::blobs_to_balls(const std::vector<Blob>& blobs, const BallTypePtr ball_type)
+{
+  std::vector<BallCandidate> ret;
+  ret.reserve(blobs.size());
+  for (const auto& blob : blobs)
+  {
+    BallCandidate ball;
+    ball.type = ball_type;
+    ball.location = blob.location;
+    ball.radius = blob.radius;
+    ret.push_back(ball);
+  }
+  return ret;
 }
 //}
 

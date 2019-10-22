@@ -62,34 +62,20 @@ namespace object_detect
       }
       //}
 
-      std::vector<Blob> blobs;
+      std::vector<BallCandidate> balls;
       {
-        std::scoped_lock<std::mutex> lck(m_active_seg_confs_mtx);
-        /* Detect blobs of required color in the RGB image //{ */
-        if (m_prev_color_id != m_drmgr_ptr->config.segment_color)
-        {
-          m_active_seg_confs = get_segmentation_configs(m_seg_confs, {m_drmgr_ptr->config.segment_color});
-          m_prev_color_id = m_drmgr_ptr->config.segment_color;
-        }
-        for (const auto& seg_conf : m_active_seg_confs)
-          NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)", color_name(seg_conf.color_id).c_str(), binarization_method_name(seg_conf.method).c_str());
+        std::scoped_lock<std::mutex> lck(m_active_ball_types_mtx);
+        for (const auto& ball_type : m_active_ball_types)
+          NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)", color_name(ball_type->seg_conf->color_id).c_str(), binarization_method_name(ball_type->seg_conf->method).c_str());
         m_blob_det.set_drcfg(m_drmgr_ptr->config);
-        if (m_drmgr_ptr->config.override_settings)
-        {
-          if (!m_active_seg_confs.empty())
-            m_active_seg_confs.at(0) = load_segmentation_config(m_drmgr_ptr->config);
-          blobs = m_blob_det.detect(rgb_img, m_active_seg_confs, label_img);
-        } else
-        {
-          blobs = m_blob_det.detect_lut(rgb_img, m_active_seg_confs, label_img);
-        }
+        balls = m_blob_det.detect_lut(rgb_img, m_active_ball_types, label_img);
       }
       if (publish_debug)
         highlight_mask(dbg_img, label_img);
       //}
 
-      /* Calculate 3D positions of the detected blobs //{ */
-      const size_t n_dets = blobs.size();
+      /* Calculate 3D positions of the detected balls //{ */
+      const size_t n_dets = balls.size();
       vector<geometry_msgs::Point32> positions;
       vector<dist_qual_t> distance_qualities;
       positions.reserve(n_dets);
@@ -98,9 +84,9 @@ namespace object_detect
       {
         cout << "[" << m_node_name << "]: Processing object " << it + 1 << "/" << n_dets << " --------------------------" << std::endl;
 
-        const Blob& blob = blobs.at(it);
-        const cv::Point& center = blob.location;
-        const float radius = blob.radius;
+        const auto& ball = balls.at(it);
+        const cv::Point& center = ball.location;
+        const float radius = ball.radius;
 
         /* Calculate 3D vector pointing to left and right edges of the detected object //{ */
         const Eigen::Vector3f l_vec = project(center.x - radius*cos(M_PI_4), center.y - radius*sin(M_PI_4), m_rgb_camera_model);
@@ -123,7 +109,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color_id, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, ball.type->seg_conf->color_id, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           cout << "Depthmap distance: " << depthmap_distance << endl;
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -188,11 +174,7 @@ namespace object_detect
       /* Publish all the calculated valid positions //{ */
       if (m_pub_det.getNumSubscribers() > 0)
       {
-        object_detect::PoseWithCovarianceArrayStamped det_msg;
-  
-        det_msg.header = rgb_img_msg->header;
-        det_msg.poses = generate_poses(positions, distance_qualities);
-
+        const object_detect::BallDetections det_msg = to_output_message(balls, rgb_img_msg->header);
         m_pub_det.publish(det_msg);
       }
       //}
@@ -240,38 +222,22 @@ namespace object_detect
   }
   //}
 
-  /* drmgr_update_loop() method //{ */
-  void ObjectDetector::drcfg_update_loop([[maybe_unused]] const ros::TimerEvent& evt)
+  /* to_output_message() method //{ */
+  object_detect::BallDetections ObjectDetector::to_output_message(const std::vector<BallCandidate>& balls, const std_msgs::Header& header) const
   {
-    if (!m_drmgr_ptr->config.override_settings)
-    {
-      std::vector<SegConf> active_seg_confs;
-      {
-        std::scoped_lock<std::mutex> lck(m_active_seg_confs_mtx);
-        active_seg_confs = m_active_seg_confs;
-      }
-      if (!active_seg_confs.empty())
-        update_drcfg(active_seg_confs.at(0));
-    }
-  }
-  //}
-
-  /* generate_poses() method //{ */
-  ObjectDetector::ros_poses_t ObjectDetector::generate_poses(const std::vector<geometry_msgs::Point32>& positions, const std::vector<dist_qual_t>& distance_qualities)
-  {
-    assert(positions.size() == distance_qualities.size());
-    ros_poses_t ret;
-    ret.reserve(positions.size());
+    object_detect::BallDetections ret;
+    ret.detections.reserve(balls.size());
   
-    for (unsigned it = 0; it < positions.size(); it++)
+    for (const auto& ball : balls)
     {
-      const auto qual = distance_qualities.at(it);
-      const auto pos = positions.at(it);
+      object_detect::BallDetection det;
+      const auto qual = ball.dist_qual;
+      const auto pos = ball.position;
   
       ros_pose_t pose;
-      pose.position.x = pos.x;
-      pose.position.y = pos.y;
-      pose.position.z = pos.z;
+      pose.position.x = pos.x();
+      pose.position.y = pos.y();
+      pose.position.z = pos.z();
       pose.orientation.x = 0;
       pose.orientation.y = 0;
       pose.orientation.z = 0;
@@ -288,17 +254,19 @@ namespace object_detect
       geometry_msgs::PoseWithCovariance pose_with_cov;
       pose_with_cov.pose = pose;
       pose_with_cov.covariance = cov;
-      ret.push_back(pose_with_cov);
+      det.pose = pose_with_cov;
+      det.type = ball.type->seg_conf->color_id;
+      ret.detections.push_back(det);
     }
+    ret.header = header;
     return ret;
   }
   //}
 
   /* generate_covariance() method //{ */
-  ObjectDetector::ros_cov_t ObjectDetector::generate_covariance(const geometry_msgs::Point32& pos, const double xy_covariance_coeff, const double z_covariance_coeff)
+  ObjectDetector::ros_cov_t ObjectDetector::generate_covariance(const Eigen::Vector3f& pos, const double xy_covariance_coeff, const double z_covariance_coeff)
   {
-    Eigen::Vector3d e_pos(pos.x, pos.y, pos.z);
-    Eigen::Matrix3d e_cov = calc_position_covariance(e_pos, xy_covariance_coeff, z_covariance_coeff);
+    Eigen::Matrix3d e_cov = calc_position_covariance(pos.cast<double>(), xy_covariance_coeff, z_covariance_coeff);
     ros_cov_t cov;
     for (int r = 0; r < 6; r++)
     {
@@ -357,22 +325,6 @@ namespace object_detect
   Eigen::Matrix3d ObjectDetector::rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation)
   {
     return rotation * covariance * rotation.transpose();  // rotate the covariance to point in direction of est. position
-  }
-  //}
-
-  /* get_active_segmentation_configs() method //{ */
-  std::vector<SegConf> ObjectDetector::get_segmentation_configs(const std::vector<SegConf>& all_seg_confs, std::vector<int> color_ids)
-  {
-    std::vector<SegConf> ret;
-    for (const auto& color_id : color_ids)
-    {
-      for (const auto& seg_conf : all_seg_confs)
-      {
-        if (seg_conf.color_id == color_id)
-          ret.push_back(seg_conf);
-      }
-    }
-    return ret;
   }
   //}
 
@@ -501,116 +453,60 @@ namespace object_detect
   }
   //}
 
-  /* load_segmentation_config() method //{ */
-  SegConf ObjectDetector::load_segmentation_config(const drcfg_t& cfg)
+  /* load_ball_type() method //{ */
+  BallTypePtr ObjectDetector::load_ball_type(mrs_lib::ParamLoader& pl, const std::string& cfg_name)
   {
-    SegConf ret;
+    BallTypePtr ret = std::make_shared<BallType>();
+    SegConfPtr seg_conf = std::make_shared<SegConf>();
   
-    ret.active = true;
-    ret.color_id = color_id_t(cfg.segment_color);
-    ret.color_name = color_name(ret.color_id);
-    ret.method = bin_method_t(cfg.binarization_method);
+    seg_conf->active = true;
+    seg_conf->color_id = color_id(cfg_name);
+    seg_conf->color_name = cfg_name;
+    std::transform(seg_conf->color_name.begin(), seg_conf->color_name.end(), seg_conf->color_name.begin(), ::tolower);
+  
+    const std::string bin_method = pl.load_param2<std::string>(seg_conf->color_name  + "/binarization_method");
+    seg_conf->method = binarization_method_id(bin_method);
   
     // Load HSV thresholding params
-    ret.hue_center = cfg.hue_center;
-    ret.hue_range = cfg.hue_range;
-    ret.sat_center = cfg.sat_center;
-    ret.sat_range = cfg.sat_range;
-    ret.val_center = cfg.val_center;
-    ret.val_range = cfg.val_range;
+    pl.load_param(seg_conf->color_name + "/hsv/hue_center", seg_conf->hue_center);
+    pl.load_param(seg_conf->color_name + "/hsv/hue_range", seg_conf->hue_range);
+    pl.load_param(seg_conf->color_name + "/hsv/sat_center", seg_conf->sat_center);
+    pl.load_param(seg_conf->color_name + "/hsv/sat_range", seg_conf->sat_range);
+    pl.load_param(seg_conf->color_name + "/hsv/val_center", seg_conf->val_center);
+    pl.load_param(seg_conf->color_name + "/hsv/val_range", seg_conf->val_range);
   
     // Load L*a*b* thresholding params
-    ret.l_center = cfg.l_center;
-    ret.l_range = cfg.l_range;
-    ret.a_center = cfg.a_center;
-    ret.a_range = cfg.a_range;
-    ret.b_center = cfg.b_center;
-    ret.b_range = cfg.b_range;
+    pl.load_param(seg_conf->color_name + "/lab/l_center", seg_conf->l_center);
+    pl.load_param(seg_conf->color_name + "/lab/l_range", seg_conf->l_range);
+    pl.load_param(seg_conf->color_name + "/lab/a_center", seg_conf->a_center);
+    pl.load_param(seg_conf->color_name + "/lab/a_range", seg_conf->a_range);
+    pl.load_param(seg_conf->color_name + "/lab/b_center", seg_conf->b_center);
+    pl.load_param(seg_conf->color_name + "/lab/b_range", seg_conf->b_range);
   
+    ret->seg_conf = seg_conf;
+
+    pl.load_param(seg_conf->color_name + "/physical_radius", ret->physical_radius);
+
     return ret;
   }
   //}
 
-  /* load_segmentation_config() method //{ */
-  SegConf ObjectDetector::load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name)
+  /* load_ball_types() method //{ */
+  std::vector<BallTypePtr> ObjectDetector::load_ball_types(mrs_lib::ParamLoader& pl, const std::vector<std::string>& color_strs)
   {
-    SegConf ret;
-  
-    ret.active = true;
-    ret.color_id = color_id(cfg_name);
-    ret.color_name = cfg_name;
-    std::transform(ret.color_name.begin(), ret.color_name.end(), ret.color_name.begin(), ::tolower);
-  
-    std::string bin_method;
-    pl.load_param(cfg_name + "/binarization_method", bin_method);
-    ret.method = binarization_method_id(bin_method);
-  
-    // Load HSV thresholding params
-    pl.load_param(cfg_name + "/hsv/hue_center", ret.hue_center);
-    pl.load_param(cfg_name + "/hsv/hue_range", ret.hue_range);
-    pl.load_param(cfg_name + "/hsv/sat_center", ret.sat_center);
-    pl.load_param(cfg_name + "/hsv/sat_range", ret.sat_range);
-    pl.load_param(cfg_name + "/hsv/val_center", ret.val_center);
-    pl.load_param(cfg_name + "/hsv/val_range", ret.val_range);
-  
-    // Load L*a*b* thresholding params
-    pl.load_param(cfg_name + "/lab/l_center", ret.l_center);
-    pl.load_param(cfg_name + "/lab/l_range", ret.l_range);
-    pl.load_param(cfg_name + "/lab/a_center", ret.a_center);
-    pl.load_param(cfg_name + "/lab/a_range", ret.a_range);
-    pl.load_param(cfg_name + "/lab/b_center", ret.b_center);
-    pl.load_param(cfg_name + "/lab/b_range", ret.b_range);
-  
-    return ret;
-  }
-  //}
-
-  /* update_drcfg() method //{ */
-  void ObjectDetector::update_drcfg(const SegConf& seg_conf)
-  {
-    drcfg_t cfg = m_drmgr_ptr->config;
-  
-    cfg.segment_color = seg_conf.color_id;
-    cfg.binarization_method = seg_conf.method;
-  
-    // Load HSV thresholding params
-    cfg.hue_center = seg_conf.hue_center;
-    cfg.hue_range = seg_conf.hue_range;
-    cfg.sat_center = seg_conf.sat_center;
-    cfg.sat_range = seg_conf.sat_range;
-    cfg.val_center = seg_conf.val_center;
-    cfg.val_range = seg_conf.val_range;
-  
-    // Load L*a*b* thresholding params
-    cfg.l_center = seg_conf.l_center;
-    cfg.l_range = seg_conf.l_range;
-    cfg.a_center = seg_conf.a_center;
-    cfg.a_range = seg_conf.a_range;
-    cfg.b_center = seg_conf.b_center;
-    cfg.b_range = seg_conf.b_range;
-  
-    m_drmgr_ptr->update_config(cfg);
-  }
-  //}
-
-  /* load_color_configs() method //{ */
-  std::vector<SegConf> ObjectDetector::load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str)
-  {
-    std::vector<SegConf> seg_confs;
-    std::stringstream ss(colors_str);
-    std::string color_name;
-    while (std::getline(ss, color_name))
+    std::vector<BallTypePtr> ball_types;
+    for (std::string color_name : color_strs)
     {
       // remove whitespaces
       color_name.erase(std::remove_if(color_name.begin(), color_name.end(), ::isspace), color_name.end());
-      // skip empty color_names (such as the last one)
+      // skip empty ball_names (such as the last one)
       if (!color_name.empty())
       {
-        SegConf seg_conf = load_segmentation_config(pl, color_name);
-        seg_confs.push_back(seg_conf);
+        BallTypePtr ball_type = load_ball_type(pl, color_name);
+        ball_types.push_back(ball_type);
       }
     }
-    return seg_confs;
+    return ball_types;
   }
   //}
 
@@ -692,15 +588,9 @@ namespace object_detect
     //}
 
     double loop_rate = pl.load_param2<double>("loop_rate", 100);
-    std::string colors_str;
-    pl.load_param("colors", colors_str);
-    m_seg_confs = load_color_configs(pl, colors_str);
-    // load the desired segmentation color as text and convert to ID
-    std::string segment_color_text = pl.load_param2<std::string>("segment_color_text");
-    drcfg_t drcfg = m_drmgr_ptr->config;
-    drcfg.segment_color = color_id(segment_color_text);
-    m_drmgr_ptr->config = drcfg;
-    m_drmgr_ptr->update_config();
+    const std::vector<std::string> color_strs = pl.load_param2<std::vector<std::string>>("colors");
+    m_ball_types = load_ball_types(pl, color_strs);
+    m_active_ball_types = m_ball_types;
 
     if (!m_drmgr_ptr->loaded_successfully())
     {
@@ -728,10 +618,10 @@ namespace object_detect
     image_transport::ImageTransport it(nh);
     m_pub_debug = it.advertise("debug_image", 1);
     m_pub_pcl = nh.advertise<sensor_msgs::PointCloud>("detected_objects_pcl", 10);
-    m_pub_det = nh.advertise<object_detect::PoseWithCovarianceArrayStamped>("detected_objects", 10);
+    m_pub_det = nh.advertise<object_detect::BallDetections>("detected_objects", 10);
 
-    m_color_change_server = nh.advertiseService("change_colors", &ObjectDetector::color_change_callback, this);
-    m_color_query_server = nh.advertiseService("query_colors", &ObjectDetector::color_query_callback, this);
+    m_ball_change_server = nh.advertiseService("change_balls", &ObjectDetector::ball_change_callback, this);
+    m_ball_query_server = nh.advertiseService("query_balls", &ObjectDetector::ball_query_callback, this);
     //}
 
     /* profiler //{ */
@@ -740,24 +630,27 @@ namespace object_detect
 
     //}
 
-    m_active_seg_confs = get_segmentation_configs(m_seg_confs, {m_drmgr_ptr->config.segment_color});
     m_prev_color_id = m_drmgr_ptr->config.segment_color;
     {
+      std::vector<SegConfPtr> seg_confs;
+      seg_confs.reserve(m_ball_types.size());
+      for (const auto& ball_type : m_ball_types)
+        seg_confs.push_back(ball_type->seg_conf);
       const auto lut_start_time = ros::WallTime::now();
       ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
-      generate_lut(m_cur_lut, m_seg_confs);
+      const auto lut = generate_lut(seg_confs);
       const auto lut_end_time = ros::WallTime::now();
       const auto lut_dur = lut_end_time - lut_start_time;
       ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
-    }
 
-    if (use_ocl)
-    {
-      m_blob_det = BlobDetector(ocl_lut_kernel_file, m_cur_lut);
-      ROS_INFO("[%s]: Using OpenCL HW acceleration.", m_node_name.c_str());
-    } else
-    {
-      m_blob_det = BlobDetector(m_cur_lut);
+      if (use_ocl)
+      {
+        m_blob_det = BlobDetector(ocl_lut_kernel_file, lut);
+        ROS_INFO("[%s]: Using OpenCL HW acceleration.", m_node_name.c_str());
+      } else
+      {
+        m_blob_det = BlobDetector(m_cur_lut);
+      }
     }
 
     m_is_initialized = true;
@@ -774,45 +667,45 @@ namespace object_detect
 
   //}
 
-  /* ObjectDetector::color_change_callback() method //{ */
+  /* ObjectDetector::ball_change_callback() method //{ */
   
-  bool ObjectDetector::color_change_callback(object_detect::ColorChange::Request& req, object_detect::ColorChange::Response& resp)
+  bool ObjectDetector::ball_change_callback(object_detect::BallChange::Request& req, object_detect::BallChange::Response& resp)
   {
-    std::vector<std::string> known_colornames;
-    std::vector<SegConf> seg_confs;
-    std::vector<std::string> unknown_colornames;
-    for (const auto& color_name : req.detectColors)
+    std::vector<std::string> known_ballnames;
+    std::vector<BallTypePtr> ball_types;
+    std::vector<std::string> unknown_ballnames;
+    for (const auto& ball_name : req.detect_balls)
     {
-      std::string lowercase = color_name;
+      std::string lowercase = ball_name;
       std::transform(lowercase.begin(), lowercase.end(), lowercase.begin(), ::tolower);
-      std::vector<SegConf> cur_seg_confs;
-      for (const auto& seg_conf : m_seg_confs)
+      std::vector<BallTypePtr> cur_ball_types;
+      for (const auto& ball_type : m_ball_types)
       {
-        if (seg_conf.color_name == lowercase)
-          cur_seg_confs.push_back(seg_conf);
+        if (ball_type->seg_conf->color_name == lowercase)
+          cur_ball_types.push_back(ball_type);
       }
-      if (cur_seg_confs.empty())
+      if (cur_ball_types.empty())
       {
-        unknown_colornames.push_back(lowercase);
+        unknown_ballnames.push_back(lowercase);
       } else
       {
-        known_colornames.push_back(lowercase);
-        seg_confs.insert(std::end(seg_confs), std::begin(cur_seg_confs), std::end(cur_seg_confs));
+        known_ballnames.push_back(lowercase);
+        ball_types.insert(std::end(ball_types), std::begin(cur_ball_types), std::end(cur_ball_types));
       }
     }
   
-    if (unknown_colornames.empty())
+    if (unknown_ballnames.empty())
     {
       {
-        std::scoped_lock<std::mutex> lck(m_active_seg_confs_mtx);
-        m_active_seg_confs = seg_confs;
+        std::scoped_lock<std::mutex> lck(m_active_ball_types_mtx);
+        m_active_ball_types = ball_types;
       }
       std::stringstream ss;
-      ss << "Detecting colors: [";
-      for (size_t it = 0; it < known_colornames.size(); it++)
+      ss << "Detecting balls: [";
+      for (size_t it = 0; it < known_ballnames.size(); it++)
       {
-        ss << known_colornames.at(it);
-        if (it < known_colornames.size()-1)
+        ss << known_ballnames.at(it);
+        if (it < known_ballnames.size()-1)
           ss << ", ";
       }
       ss << "]";
@@ -822,11 +715,11 @@ namespace object_detect
     } else
     {
       std::stringstream ss;
-      ss << "Unknown colors: [";
-      for (size_t it = 0; it < unknown_colornames.size(); it++)
+      ss << "Unknown balls: [";
+      for (size_t it = 0; it < unknown_ballnames.size(); it++)
       {
-        ss << unknown_colornames.at(it);
-        if (it < unknown_colornames.size()-1)
+        ss << unknown_ballnames.at(it);
+        if (it < unknown_ballnames.size()-1)
           ss << ", ";
       }
       ss << "]";
@@ -839,14 +732,14 @@ namespace object_detect
   
   //}
 
-  /* ObjectDetector::color_query_callback() method //{ */
+  /* ObjectDetector::ball_query_callback() method //{ */
   
-  bool ObjectDetector::color_query_callback(object_detect::ColorQuery::Request& req, object_detect::ColorQuery::Response& resp)
+  bool ObjectDetector::ball_query_callback([[maybe_unused]] object_detect::BallQuery::Request& req, object_detect::BallQuery::Response& resp)
   {
-    resp.colors.reserve(m_seg_confs.size());
-    for (const auto& seg_conf : m_seg_confs)
+    resp.ball_types.reserve(m_ball_types.size());
+    for (const auto& ball_type : m_ball_types)
     {
-      resp.colors.push_back(seg_conf.color_name);
+      resp.ball_types.push_back(ball_type->seg_conf->color_name);
     }
     return true;
   }

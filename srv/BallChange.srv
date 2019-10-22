@@ -1,4 +1,4 @@
-string[] detectColors
+string[] detect_balls
 ---
 bool success
 string message

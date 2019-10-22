@@ -42,14 +42,15 @@ generate_dynamic_reconfigure_options(
 #Generate messages in the 'msg' folder
 add_message_files(
    FILES
-   PoseWithCovarianceArrayStamped.msg
+   BallDetection.msg
+   BallDetections.msg
  )
 
 #Generate services in the 'srv' folder
 add_service_files(
    FILES
-   ColorChange.srv
-   ColorQuery.srv
+   BallChange.srv
+   BallQuery.srv
  )
 
 ## Generate added messages and services with any dependencies listed here
@@ -76,14 +77,14 @@ include_directories(include
   ${Eigen_INCLUDE_DIRS}
 )
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -DNDEBUG")
-set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -DNDEBUG")
-# set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
-# set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
-# set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
-# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
+# set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
+# set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
+# set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
+# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
+set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
+set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
 
 # add_executable(display_tracking src/display_tracking.cpp)
 # add_dependencies(display_tracking
@@ -105,7 +106,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -
 #   ${OpenCV_LIBRARIES}
 # )
 
-add_library(ObjectDetector src/ObjectDetector.cpp src/BlobDetector.cpp src/utility_fcs.cpp src/SegConf.cpp src/color_mapping.cpp)
+add_library(ObjectDetector src/ObjectDetector.cpp src/BlobDetector.cpp src/BallCandidate.cpp src/utility_fcs.cpp src/SegConf.cpp src/color_mapping.cpp)
 add_dependencies(ObjectDetector
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}

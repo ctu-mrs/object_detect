@@ -45,14 +45,15 @@
 #include <mrs_lib/Profiler.h>
 
 // Includes from this package
-#include <object_detect/PoseWithCovarianceArrayStamped.h>
+#include <object_detect/BallDetections.h>
 #include <object_detect/DetectionParamsConfig.h>
-#include <object_detect/ColorChange.h>
-#include <object_detect/ColorQuery.h>
-#include "object_detect/color_mapping.h"
-#include "object_detect/SegConf.h"
+#include <object_detect/BallChange.h>
+#include <object_detect/BallQuery.h>
+#include "object_detect/BallType.h"
+#include "object_detect/BallCandidate.h"
 #include "object_detect/BlobDetector.h"
 #include "object_detect/utility_fcs.h"
+#include "object_detect/color_mapping.h"
 
 //}
 
@@ -62,15 +63,6 @@ namespace object_detect
 {
   // shortcut type to the dynamic reconfigure manager template instance
   typedef mrs_lib::DynamicReconfigureMgr<object_detect::DetectionParamsConfig> drmgr_t;
-
-  enum dist_qual_t
-  {
-    unknown_qual = -1,
-    no_estimate = 0,
-    blob_size = 1,
-    depthmap = 2,
-    both = 3,
-  };
 
   static std::map<std::string, bin_method_t> binname2id =
     {
@@ -132,9 +124,8 @@ namespace object_detect
 
     private:
 
-      using ros_poses_t = object_detect::PoseWithCovarianceArrayStamped::_poses_type;
-      using ros_pose_t = ros_poses_t::value_type::_pose_type;
-      using ros_cov_t = ros_poses_t::value_type::_covariance_type;
+      using ros_pose_t = BallDetection::_pose_type::_pose_type;
+      using ros_cov_t = BallDetection::_pose_type::_covariance_type;
 
     public:
       ObjectDetector() : m_node_name("ObjectDetector") {};
@@ -143,17 +134,15 @@ namespace object_detect
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
       void drcfg_update_loop([[maybe_unused]] const ros::TimerEvent& evt);
-      ros_poses_t generate_poses(const std::vector<geometry_msgs::Point32>& positions, const std::vector<dist_qual_t>& distance_qualities);
-      static ros_cov_t generate_covariance(const geometry_msgs::Point32& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
+      object_detect::BallDetections to_output_message(const std::vector<BallCandidate>& balls, const std_msgs::Header& header) const;
+      static ros_cov_t generate_covariance(const Eigen::Vector3f& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);
-      SegConf load_segmentation_config(const drcfg_t& cfg);
-      SegConf load_segmentation_config(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
-      std::vector<SegConf> load_color_configs(mrs_lib::ParamLoader& pl, const std::string& colors_str);
+      BallTypePtr load_ball_type(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
+      std::vector<BallTypePtr> load_ball_types(mrs_lib::ParamLoader& pl, const std::vector<std::string>& color_strs);
       void highlight_mask(cv::Mat& img, cv::Mat label_img);
-      std::vector<SegConf> get_segmentation_configs(const std::vector<SegConf>& all_seg_confs, std::vector<int> color_ids);
-      bool color_change_callback(object_detect::ColorChange::Request& req, object_detect::ColorChange::Response& resp);
-      bool color_query_callback(object_detect::ColorQuery::Request& req, object_detect::ColorQuery::Response& resp);
+      bool ball_change_callback(object_detect::BallChange::Request& req, object_detect::BallChange::Response& resp);
+      bool ball_query_callback([[maybe_unused]] object_detect::BallQuery::Request& req, object_detect::BallQuery::Response& resp);
 
     private:
       // --------------------------------------------------------------
@@ -169,9 +158,9 @@ namespace object_detect
       double m_min_depth;
       double m_max_depth;
       std::string m_ocl_lut_kernel_file;
-      std::vector<SegConf> m_seg_confs;
-      std::mutex m_active_seg_confs_mtx;
-      std::vector<SegConf> m_active_seg_confs;
+      std::vector<BallTypePtr> m_ball_types;
+      std::mutex m_active_ball_types_mtx;
+      std::vector<BallTypePtr> m_active_ball_types;
       std::map<dist_qual_t, std::pair<double, double>> m_cov_coeffs;
       //}
 
@@ -189,8 +178,8 @@ namespace object_detect
       ros::Publisher m_pub_pcl;
       image_transport::Publisher m_pub_debug;
 
-      ros::ServiceServer m_color_change_server;
-      ros::ServiceServer m_color_query_server;
+      ros::ServiceServer m_ball_change_server;
+      ros::ServiceServer m_ball_query_server;
 
       ros::Timer m_main_loop_timer;
       ros::Timer m_drcfg_update_loop_timer;

@@ -259,10 +259,11 @@ namespace object_detect
 
   /* lookup_lut() //{ */
 
-  lut_elem_t lookup_lut(const lut_t& lut, size_t r, size_t g, size_t b)
+  lut_elem_t lookup_lut(cv::InputArray lut, size_t r, size_t g, size_t b)
   {
-    assert(lut.size() == lut_size);
-    return lut[r + lut_dim*g + lut_dim*lut_dim*b];
+    /* assert(lut.size() == lut_size); */
+    const auto lut_mat = lut.getMat();
+    return lut_mat.at<lut_elem_t>(r + lut_dim*g + lut_dim*lut_dim*b);
   }
 
   //}
