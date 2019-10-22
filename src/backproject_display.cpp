@@ -21,7 +21,7 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/subscribe_handler.h>
-#include "SegConf.h"
+#include "object_detect/SegConf.h"
 
 using namespace cv;
 using namespace std;

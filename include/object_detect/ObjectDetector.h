@@ -49,9 +49,10 @@
 #include <object_detect/DetectionParamsConfig.h>
 #include <object_detect/ColorChange.h>
 #include <object_detect/ColorQuery.h>
-#include "SegConf.h"
-#include "BlobDetector.h"
-#include "utility_fcs.h"
+#include "object_detect/color_mapping.h"
+#include "object_detect/SegConf.h"
+#include "object_detect/BlobDetector.h"
+#include "object_detect/utility_fcs.h"
 
 //}
 
@@ -71,16 +72,6 @@ namespace object_detect
     both = 3,
   };
 
-  // THESE MUST CORRESPOND TO THE VALUES, SPECIFIED IN THE DYNAMIC RECONFIGURE SCRIPT (DetectionParams.cfg)!
-  static std::map<std::string, std::pair<color_id_t, cv::Scalar>> colors =
-    {
-      {"red",    {color_id_t::red, cv::Scalar(0, 0, 128)}},
-      {"green",  {color_id_t::green, cv::Scalar(0, 128, 0)}},
-      {"blue",   {color_id_t::blue, cv::Scalar(128, 0, 0)}},
-      {"yellow", {color_id_t::yellow, cv::Scalar(0, 128, 128)}},
-      {"orange", {color_id_t::orange, cv::Scalar(0, 88, 168)}},
-      {"white",  {color_id_t::white, cv::Scalar(44, 0, 88)}},
-    };
   static std::map<std::string, bin_method_t> binname2id =
     {
       {"hsv", bin_method_t::hsv},
@@ -95,35 +86,6 @@ namespace object_detect
   };
 
   /* binarization_method_id() and color_id() helper functions //{ */
-  color_id_t color_id(std::string name)
-  {
-    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-    if (colors.find(name) == std::end(colors))
-      return color_id_t::unknown_color;
-    else
-      return colors.at(name).first;
-  }
-
-  cv::Scalar color_highlight(color_id_t id)
-  {
-    for (const auto& keyval : colors)
-    {
-      if (keyval.second.first == id)
-        return keyval.second.second;
-    }
-    return cv::Scalar(0, 0, 128);
-  }
-
-  std::string color_name(color_id_t id)
-  {
-    for (const auto& keyval : colors)
-    {
-      if (keyval.second.first == id)
-        return keyval.first;
-    }
-    return "unknown";
-  }
-
   bin_method_t binarization_method_id(std::string name)
   {
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);

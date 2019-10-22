@@ -60,7 +60,8 @@ add_service_files(
  )
 
 catkin_package(
-  CATKIN_DEPENDS message_runtime image_transport # roscpp rospy std_msgs
+  INCLUDE_DIRS include
+  CATKIN_DEPENDS image_transport # roscpp rospy std_msgs
 )
 
 ###########
@@ -104,7 +105,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -O3 -DUSE_OPENCL -fopenmp -
 #   ${OpenCV_LIBRARIES}
 # )
 
-add_library(ObjectDetector src/ObjectDetector.cpp src/BlobDetector.cpp src/utility_fcs.cpp src/SegConf.cpp)
+add_library(ObjectDetector src/ObjectDetector.cpp src/BlobDetector.cpp src/utility_fcs.cpp src/SegConf.cpp src/color_mapping.cpp)
 add_dependencies(ObjectDetector
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}

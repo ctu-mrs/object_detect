@@ -3,8 +3,10 @@
 
 #include <iostream>
 #include <vector>
+#include <memory>
 #include <stdint.h>
 #include <opencv2/imgproc/imgproc.hpp>
+#include "object_detect/color_mapping.h"
 
 namespace object_detect
 {
@@ -13,16 +15,6 @@ namespace object_detect
   using lut_elem_t = uint8_t;
   using lut_t = std::vector<lut_elem_t>;
 
-  enum color_id_t
-  {
-    unknown_color = -1,
-    red     = ( 0x01 << 0 ),
-    green   = ( 0x01 << 1 ),
-    blue    = ( 0x01 << 2 ),
-    yellow  = ( 0x01 << 3 ),
-    orange  = ( 0x01 << 4 ),
-    white   = ( 0x01 << 5 ),
-  };
   enum bin_method_t
   {
     unknown_method = -1,
@@ -34,8 +26,10 @@ namespace object_detect
   {
     bool active;
 
-    color_id_t color;   // id of the color, segmented using this config
+    color_id_t color_id;   // id of the color, segmented using this config
     std::string color_name;
+    double physical_size;
+
     bin_method_t method;  // id of the segmentation method used
 
     // HSV thresholding parameters
@@ -55,7 +49,9 @@ namespace object_detect
     double b_range;
   };
 
-  void generate_lut(lut_t& ret, const std::vector<SegConf>& seg_confs);
+  using SegConfPtr = std::shared_ptr<SegConf>;
+
+  lut_t generate_lut(const std::vector<SegConfPtr>& seg_confs);
   lut_elem_t lookup_lut(const lut_t& lut, size_t r, size_t g, size_t b);
 
 }

@@ -1,4 +1,4 @@
-#include "SegConf.h"
+#include "object_detect/SegConf.h"
 
 namespace object_detect
 {
@@ -61,10 +61,10 @@ namespace object_detect
 
   //}
 
-  void add_lut_hsv(lut_t& ret, const SegConf& seg_conf)
+  void add_lut_hsv(lut_t& ret, SegConfPtr seg_conf)
   {
-    double hue_lower = seg_conf.hue_center - seg_conf.hue_range / 2.0;
-    double hue_higher = seg_conf.hue_center + seg_conf.hue_range / 2.0;
+    double hue_lower = seg_conf->hue_center - seg_conf->hue_range / 2.0;
+    double hue_higher = seg_conf->hue_center + seg_conf->hue_range / 2.0;
     bool overflow;
     static cv::Mat rgb2hsv_lut;
     if (rgb2hsv_lut.empty())
@@ -98,18 +98,18 @@ namespace object_detect
     }
     //}
 
-    const double sat_lower = seg_conf.sat_center - seg_conf.sat_range / 2.0;
-    const double sat_higher = seg_conf.sat_center + seg_conf.sat_range / 2.0;
+    const double sat_lower = seg_conf->sat_center - seg_conf->sat_range / 2.0;
+    const double sat_higher = seg_conf->sat_center + seg_conf->sat_range / 2.0;
 
-    const double val_lower = seg_conf.val_center - seg_conf.val_range / 2.0;
-    const double val_higher = seg_conf.val_center + seg_conf.val_range / 2.0;
+    const double val_lower = seg_conf->val_center - seg_conf->val_range / 2.0;
+    const double val_higher = seg_conf->val_center + seg_conf->val_range / 2.0;
 
     parallel_for_(cv::Range(0, lut_dim), parallelHSVLUT(
           rgb2hsv_lut,
           hue_lower, hue_higher, overflow,
           sat_lower, sat_higher,
           val_lower, val_higher,
-          seg_conf.color, ret));
+          seg_conf->color_id, ret));
 }
 
   //}
@@ -172,7 +172,7 @@ namespace object_detect
 
   //}
 
-  void add_lut_lab(lut_t& ret, const SegConf& seg_conf)
+  void add_lut_lab(lut_t& ret, const SegConfPtr& seg_conf)
   {
     static cv::Mat rgb2lab_lut;
     if (rgb2lab_lut.empty())
@@ -191,21 +191,21 @@ namespace object_detect
       cv::cvtColor(rgb2lab_lut, rgb2lab_lut, cv::COLOR_RGB2Lab);
     }
 
-    const double l_lower = seg_conf.l_center - seg_conf.l_range / 2.0;
-    const double l_higher = seg_conf.l_center + seg_conf.l_range / 2.0;
+    const double l_lower = seg_conf->l_center - seg_conf->l_range / 2.0;
+    const double l_higher = seg_conf->l_center + seg_conf->l_range / 2.0;
 
-    const double a_lower = seg_conf.a_center - seg_conf.a_range / 2.0;
-    const double a_higher = seg_conf.a_center + seg_conf.a_range / 2.0;
+    const double a_lower = seg_conf->a_center - seg_conf->a_range / 2.0;
+    const double a_higher = seg_conf->a_center + seg_conf->a_range / 2.0;
 
-    const double b_lower = seg_conf.b_center - seg_conf.b_range / 2.0;
-    const double b_higher = seg_conf.b_center + seg_conf.b_range / 2.0;
+    const double b_lower = seg_conf->b_center - seg_conf->b_range / 2.0;
+    const double b_higher = seg_conf->b_center + seg_conf->b_range / 2.0;
 
     parallel_for_(cv::Range(0, lut_dim), parallelLabLUT(
           rgb2lab_lut,
           l_lower, l_higher,
           a_lower, a_higher,
           b_lower, b_higher,
-          seg_conf.color, ret
+          seg_conf->color_id, ret
         ));
   }
 
@@ -231,14 +231,15 @@ namespace object_detect
 
   /* generate_lut() //{ */
 
-  void generate_lut(lut_t& ret, const std::vector<SegConf>& seg_confs)
+  lut_t generate_lut(const std::vector<SegConfPtr>& seg_confs)
   {
+    lut_t ret;
     ret.resize(lut_size);
     for (size_t it = 0; it < lut_size; it++)
       ret[it] = 0;
     for (const auto& seg_conf : seg_confs)
     {
-      switch (seg_conf.method)
+      switch (seg_conf->method)
       {
         case bin_method_t::hsv:
           add_lut_hsv(ret, seg_conf);
@@ -251,6 +252,7 @@ namespace object_detect
           break;
       }
     }
+    return ret;
   }
 
   //}

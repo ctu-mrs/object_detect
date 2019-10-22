@@ -1,4 +1,4 @@
-#include "BlobDetector.h"
+#include "object_detect/BlobDetector.h"
 
 using namespace cv;
 using namespace std;
@@ -246,7 +246,7 @@ std::vector<Blob> BlobDetector::find_blobs(const cv::Mat binary_image, const lut
         }
     }
 
-    blob.color = color_label;
+    blob.color_id = color_label;
     blob.contours.push_back(contours[contourIdx]);
 
     blobs_ret.push_back(blob);
@@ -291,7 +291,7 @@ std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<Seg
   std::vector<uint8_t> labels;
   labels.reserve(seg_confs.size());
   for (const auto& seg_conf : seg_confs)
-    labels.push_back(seg_conf.color);
+    labels.push_back(seg_conf.color_id);
   cv::Mat bin_imgs;
 
   bool ocl_success = false;
@@ -309,7 +309,7 @@ std::vector<Blob> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<Seg
     const auto& seg_conf = seg_confs.at(it);
     cv::Mat binary_img = bin_imgs(cv::Rect(it*in_img.cols*in_img.rows, 0, in_img.cols*in_img.rows, 1)).reshape(0, in_img.rows);
     postprocess_binary_image(binary_img);
-    const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
+    const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color_id);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
   }
 #ifdef ENABLE_PROFILING
@@ -357,11 +357,11 @@ std::vector<Blob> BlobDetector::detect(cv::Mat in_img, const std::vector<SegConf
     if (binary_img.empty()) // in case of invalid binarization method (shouldn't happen)
       continue;
     postprocess_binary_image(binary_img);
-    const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color);
+    const std::vector<Blob> tmp_blobs = find_blobs(binary_img, seg_conf.color_id);
     blobs.insert(std::end(blobs), std::begin(tmp_blobs), std::end(tmp_blobs)); 
     if (p_labels_img.needed())
     {
-      const cv::Mat tmp_img = binary_img/255*seg_conf.color;
+      const cv::Mat tmp_img = binary_img/255*seg_conf.color_id;
       cv::bitwise_or(p_labels_img, tmp_img, p_labels_img);
     }
   }
@@ -608,14 +608,14 @@ bool BlobDetector::segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, 
 
   for (int it = 0; it < labels_len; it++)
   {
-    uint8_t color = labels.at<uint8_t>(it);
+    uint8_t color_id = labels.at<uint8_t>(it);
     const cv::Rect roi(it*in_img_len, 0, in_img_len, 1);
     cv::Mat binary_img = bin_imgs(roi).reshape(0, in_img.rows);
     bool ocl_success = false;
     if (m_use_ocl)
-      ocl_success = bitwise_and_ocl(color, p_labels_img, binary_img);
+      ocl_success = bitwise_and_ocl(color_id, p_labels_img, binary_img);
     if (!ocl_success)
-      cv::bitwise_and(p_labels_img, cv::Scalar(color), binary_img);
+      cv::bitwise_and(p_labels_img, cv::Scalar(color_id), binary_img);
   }
 
   return true;

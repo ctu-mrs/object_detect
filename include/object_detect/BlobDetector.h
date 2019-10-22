@@ -12,7 +12,7 @@
 
 // local includes
 #include <object_detect/DetectionParamsConfig.h>
-#include "SegConf.h"
+#include "object_detect/SegConf.h"
 
 namespace object_detect
 {
@@ -22,7 +22,7 @@ namespace object_detect
 
   struct Blob
   {
-    lut_elem_t color;
+    lut_elem_t color_id;
     double confidence;
     cv::Point2d location;
     double radius;

@@ -1,4 +1,4 @@
-#include "ObjectDetector.h"
+#include "object_detect/ObjectDetector.h"
 
 using namespace cv;
 using namespace std;
@@ -72,7 +72,7 @@ namespace object_detect
           m_prev_color_id = m_drmgr_ptr->config.segment_color;
         }
         for (const auto& seg_conf : m_active_seg_confs)
-          NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)", color_name(seg_conf.color).c_str(), binarization_method_name(seg_conf.method).c_str());
+          NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)", color_name(seg_conf.color_id).c_str(), binarization_method_name(seg_conf.method).c_str());
         m_blob_det.set_drcfg(m_drmgr_ptr->config);
         if (m_drmgr_ptr->config.override_settings)
         {
@@ -123,7 +123,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, blob.color_id, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           cout << "Depthmap distance: " << depthmap_distance << endl;
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -368,7 +368,7 @@ namespace object_detect
     {
       for (const auto& seg_conf : all_seg_confs)
       {
-        if (seg_conf.color == color_id)
+        if (seg_conf.color_id == color_id)
           ret.push_back(seg_conf);
       }
     }
@@ -507,8 +507,8 @@ namespace object_detect
     SegConf ret;
   
     ret.active = true;
-    ret.color = color_id_t(cfg.segment_color);
-    ret.color_name = color_name(ret.color);
+    ret.color_id = color_id_t(cfg.segment_color);
+    ret.color_name = color_name(ret.color_id);
     ret.method = bin_method_t(cfg.binarization_method);
   
     // Load HSV thresholding params
@@ -537,7 +537,7 @@ namespace object_detect
     SegConf ret;
   
     ret.active = true;
-    ret.color = color_id(cfg_name);
+    ret.color_id = color_id(cfg_name);
     ret.color_name = cfg_name;
     std::transform(ret.color_name.begin(), ret.color_name.end(), ret.color_name.begin(), ::tolower);
   
@@ -570,7 +570,7 @@ namespace object_detect
   {
     drcfg_t cfg = m_drmgr_ptr->config;
   
-    cfg.segment_color = seg_conf.color;
+    cfg.segment_color = seg_conf.color_id;
     cfg.binarization_method = seg_conf.method;
   
     // Load HSV thresholding params
