@@ -607,7 +607,6 @@ namespace object_detect
     
     /** Create publishers and subscribers //{**/
     // Initialize transform listener
-    m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(m_tf_buffer, m_node_name);
     // Initialize other subs and pubs
     SubscribeMgr smgr(nh);
     m_sh_dm = smgr.create_handler<sensor_msgs::Image>("dm_image", ros::Duration(5.0));
@@ -658,7 +657,6 @@ namespace object_detect
     /* timers  //{ */
 
     m_main_loop_timer = nh.createTimer(ros::Rate(loop_rate), &ObjectDetector::main_loop, this);
-    m_drcfg_update_loop_timer = nh.createTimer(ros::Rate(2.0), &ObjectDetector::drcfg_update_loop, this);
 
     //}
 

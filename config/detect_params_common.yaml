@@ -1,5 +1,7 @@
 ############### Distance estimation parameters ###############
-object_radius: 0.08
+colors: [
+  "Red"
+  ]
 # distance estimation from object size parameters
 max_dist: 30.0
 max_dist_diff: 4.0
@@ -11,7 +13,6 @@ max_depth: 12000 # millimetres
 # z_covariance_coeff: 0.005
 loop_rate: 100 # how often the detection loop should run
 use_ocl: true # whether to use OpenCL hardware acceleration
-segment_color_text: "red"
 cov_coeffs:
   xy:
     no_estimate: 2.5

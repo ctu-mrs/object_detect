@@ -1,7 +1,0 @@
-binarization_method: HSV
-hsv: {
-  hue_center: 0, hue_range: 5,
-  sat_center: 128,  sat_range: 256,
-  val_center: 128, val_range: 256}
-lab: {a_center: 158.02017499737448, a_range: 12.562620762240613, b_center: 101.71139251701057,
-  b_range: 28.25917031954412, l_center: 176.86374967526547, l_range: 186.38769347352346}

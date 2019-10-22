@@ -133,7 +133,6 @@ namespace object_detect
 
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
-      void drcfg_update_loop([[maybe_unused]] const ros::TimerEvent& evt);
       object_detect::BallDetections to_output_message(const std::vector<BallCandidate>& balls, const std_msgs::Header& header) const;
       static ros_cov_t generate_covariance(const Eigen::Vector3f& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
@@ -166,8 +165,6 @@ namespace object_detect
 
       /* ROS related variables (subscribers, timers etc.) //{ */
       std::unique_ptr<drmgr_t> m_drmgr_ptr;
-      tf2_ros::Buffer m_tf_buffer;
-      std::unique_ptr<tf2_ros::TransformListener> m_tf_listener_ptr;
 
       mrs_lib::SubscribeHandlerPtr<sensor_msgs::Image> m_sh_dm;
       mrs_lib::SubscribeHandlerPtr<sensor_msgs::CameraInfo> m_sh_dm_cinfo;
@@ -182,7 +179,6 @@ namespace object_detect
       ros::ServiceServer m_ball_query_server;
 
       ros::Timer m_main_loop_timer;
-      ros::Timer m_drcfg_update_loop_timer;
       //}
 
     private:
@@ -208,7 +204,6 @@ namespace object_detect
 
       //{
       //
-      void update_drcfg(const SegConf& seg_conf);
       // Checks whether a calculated distance is valid
       bool distance_valid(float distance);
       // Estimates distance of an object based on the 3D vectors pointing to its edges and known distance between those edges
