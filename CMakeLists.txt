@@ -63,6 +63,7 @@ add_service_files(
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS image_transport # roscpp rospy std_msgs
+  LIBRARIES color_mapping
 )
 
 ###########
@@ -125,3 +126,9 @@ target_link_libraries(backproject_display
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
+
+add_library(color_mapping src/color_mapping.cpp)
+target_link_libraries(color_mapping
+  ${catkin_LIBRARIES}
+  ${Eigen_LIBRARIES}
+  )
