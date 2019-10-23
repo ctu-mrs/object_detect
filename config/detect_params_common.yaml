@@ -1,6 +1,6 @@
 ############### Distance estimation parameters ###############
 colors: [
-  "RedBF"
+  "Red"
   ]
 # distance estimation from object size parameters
 max_dist: 30.0
@@ -8,6 +8,8 @@ max_dist_diff: 4.0
 # depthmap parameters
 min_depth: 200 # millimetres
 max_depth: 12000 # millimetres
+distance_min_valid_pixels_ratio: 0.05
+
  ############### Other parameters ###############
 # xy_covariance_coeff: 0.001
 # z_covariance_coeff: 0.005

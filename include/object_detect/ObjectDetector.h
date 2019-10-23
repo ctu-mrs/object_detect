@@ -208,7 +208,7 @@ namespace object_detect
       // Estimates distance of an object based on the 3D vectors pointing to its edges and known distance between those edges
       float estimate_distance_from_known_size(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float known_size);
       // Estimates distance based on information from a depthmap, masked using the binary thresholded image, optionally marks used pixels in the debug image
-      float estimate_distance_from_depthmap(const cv::Point2f& area_center, float area_radius, const cv::Mat& dm_img, const cv::Mat& label_img, lut_elem_t color_id, cv::InputOutputArray dbg_img = cv::noArray());
+      float estimate_distance_from_depthmap(const cv::Point2f& area_center, const float area_radius, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img);
       //}
 
   };

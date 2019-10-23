@@ -75,18 +75,22 @@ namespace object_detect
       //}
 
       /* Calculate 3D positions of the detected balls //{ */
-      const size_t n_dets = balls.size();
       vector<geometry_msgs::Point32> positions;
       vector<dist_qual_t> distance_qualities;
-      positions.reserve(n_dets);
+      positions.reserve(balls.size());
 
-      for (size_t it = 0; it < n_dets; it++)
+      for (size_t it = 0; it < balls.size(); it++)
       {
-        cout << "[" << m_node_name << "]: Processing object " << it + 1 << "/" << n_dets << " --------------------------" << std::endl;
+        cout << "[" << m_node_name << "]: Processing object " << it + 1 << "/" << balls.size() << " --------------------------" << std::endl;
 
-        const auto& ball = balls.at(it);
+        BallCandidate& ball = balls.at(it);
+        const bool valid_ball = !ball.type->unknown();
         const cv::Point& center = ball.location;
         const float radius = ball.radius;
+        const bool physical_radius_known = valid_ball && !std::isnan(ball.type->physical_radius);
+        std::string name_upper = ball.type->seg_conf->color_name;
+        std::transform(name_upper.begin(), name_upper.end(), name_upper.begin(), ::toupper);
+        cout << "object classified as " << name_upper << " ball" << std::endl;
 
         /* Calculate 3D vector pointing to left and right edges of the detected object //{ */
         const Eigen::Vector3f l_vec = project(center.x - radius*cos(M_PI_4), center.y - radius*sin(M_PI_4), m_rgb_camera_model);
@@ -96,9 +100,9 @@ namespace object_detect
         /* Estimate distance based on known size of object if applicable //{ */
         float estimated_distance = 0.0f;
         bool estimated_distance_valid = false;
-        if (m_object_radius_known)
+        if (physical_radius_known)
         {
-          estimated_distance = estimate_distance_from_known_size(l_vec, r_vec, m_object_radius);
+          estimated_distance = estimate_distance_from_known_size(l_vec, r_vec, ball.type->physical_radius);
           cout << "Estimated distance: " << estimated_distance << endl;
           estimated_distance_valid = distance_valid(estimated_distance);
         }
@@ -109,7 +113,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, radius, dm_img, label_img, ball.type->seg_conf->color_id, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(center, radius, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           cout << "Depthmap distance: " << depthmap_distance << endl;
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -155,6 +159,8 @@ namespace object_detect
           /* Calculate the estimated position of the object //{ */
           const Eigen::Vector3f pos_vec = resulting_distance * (l_vec + r_vec) / 2.0;
           cout << "Estimated location (camera CS): [" << pos_vec(0) << ", " << pos_vec(1) << ", " << pos_vec(2) << "]" << std::endl;
+          ball.position = pos_vec;
+          /* cout << "Estimated location (camera CS): [" << ball.position(0) << ", " << ball.position(1) << ", " << ball.position(2) << "]" << std::endl; */
           //}
 
           /* If all is OK, add the position to the vector //{ */
@@ -166,8 +172,9 @@ namespace object_detect
           distance_qualities.push_back(resulting_distance_quality);
           //}
         }
+        ball.dist_qual = resulting_distance_quality;
 
-        cout << "[" << m_node_name << "]: Done with object " << it + 1 << "/" << n_dets << " --------------------------" << std::endl;
+        cout << "[" << m_node_name << "]: Done with object " << it + 1 << "/" << balls.size() << " --------------------------" << std::endl;
       }
       //}
 
@@ -245,7 +252,7 @@ namespace object_detect
   
       if (m_cov_coeffs.find(qual) == std::end(m_cov_coeffs))
       {
-        ROS_ERROR_THROTTLE(1.0, "[ObjectDetector]: Invalid distance estimate quality %d! Skipping detection.", qual);
+        ROS_ERROR("[ObjectDetector]: Invalid distance estimate quality %d! Skipping detection.", qual);
         continue;
       }
       auto [xy_covariance_coeff, z_covariance_coeff] = m_cov_coeffs.at(qual);
@@ -336,50 +343,34 @@ namespace object_detect
   //}
 
   /* estimate_distance_from_known_size() method //{ */
-  float ObjectDetector::estimate_distance_from_known_size(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float known_size)
+  float ObjectDetector::estimate_distance_from_known_size(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float physical_radius)
   {
-    const float alpha = acos(l_vec.dot(r_vec)) / 2.0;
-    return known_size * sin(M_PI_2 - alpha) * (tan(alpha) + cot(alpha));
+    const Eigen::Vector3f c_vec = (l_vec + r_vec) / 2.0f;
+    const float dot = c_vec.dot(l_vec)/(c_vec.norm() * l_vec.norm());
+    const float dist = physical_radius/std::sqrt(1.0f - dot*dot);
+    return dist;
   }
   //}
 
   /* estimate_distance_from_depthmap() method //{ */
-  float ObjectDetector::estimate_distance_from_depthmap(const cv::Point2f& area_center, float area_radius, const cv::Mat& dm_img, const cv::Mat& label_img, lut_elem_t color_id, cv::InputOutputArray dbg_img)
+  float ObjectDetector::estimate_distance_from_depthmap(const cv::Point2f& area_center, const float area_radius, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img)
   {
     bool publish_debug = dbg_img.needed();
     cv::Mat dbg_mat;
     if (publish_debug)
       dbg_mat = dbg_img.getMat();
   
-    float dm_dist = 0;
-    size_t n_dm_samples = 0;
-  
-    Point tmp_topleft(area_center.x - area_radius, ceil(area_center.y - area_radius));
-    Point tmp_botright(area_center.x + area_radius, ceil(area_center.y + area_radius));
-    // clamp the x dimension
-    if (tmp_topleft.x < 0)
-    {
-      tmp_topleft.x = 0;
-    } else if (tmp_botright.x >= dm_img.cols)
-    {
-      tmp_botright.x = dm_img.cols-1;
-    }
-    // clamp the y dimension
-    if (tmp_topleft.y < 0)
-    {
-      tmp_topleft.y = 0;
-    } else if (tmp_botright.y >= dm_img.rows)
-    {
-      tmp_botright.y = dm_img.rows-1;
-    }
-    const cv::Rect roi(tmp_topleft, tmp_botright);
+    const cv::Rect roi = circle_roi_clamped(area_center, area_radius, dm_img.size());
+    const cv::Mat tmp_mask = circle_mask(area_center, area_radius, roi);
     const cv::Mat tmp_dm_img = dm_img(roi);
-    cv::Mat tmp_mask;
-    cv::bitwise_and(label_img(roi), cv::Scalar(color_id), tmp_mask);
     cv::Mat tmp_dbg_img = publish_debug ? dbg_mat(roi) : cv::Mat();
     const Size size = tmp_dm_img.size();
+    size_t n_candidates = cv::sum(tmp_mask)[0]/255.0;
   
-    // average over all pixels in the area of the detected blob
+    size_t n_dm_samples = 0;
+    std::vector<float> dists;
+    dists.reserve(n_candidates);
+    // find median of all pixels in the area of the detected blob
     // go through all pixels in a square of size 2*radius
     for (int x = 0; x < size.width; x++)
     {
@@ -393,30 +384,31 @@ namespace object_detect
         if (depth <= m_min_depth
          || depth >= m_max_depth)
           continue;
-        const float u = tmp_topleft.x + x;
-        const float v = tmp_topleft.y + y;
-        dm_dist += depth2range(depth, u, v, m_dm_camera_model.fx(), m_dm_camera_model.fy(), m_dm_camera_model.cx(), m_dm_camera_model.cy());
-        if (std::isnan(dm_dist))
+        const float u = roi.tl().x + x;
+        const float v = roi.tl().y + y;
+        const float dist = depth2range(depth, u, v, m_dm_camera_model.fx(), m_dm_camera_model.fy(), m_dm_camera_model.cx(), m_dm_camera_model.cy());
+        if (std::isnan(dist))
           ROS_WARN("[ObjectDetector]: Distance is nan! Skipping.");
         else
         {
           n_dm_samples++;
+          dists.push_back(dist);
           if (publish_debug)
             mark_pixel(tmp_dbg_img, x, y, 2);
         }
       }
     }
-    if (n_dm_samples > 0)
+    const double valid_ratio = double(n_dm_samples)/double(n_candidates);
+    if (valid_ratio > min_valid_ratio)
     {
-      // calculate average from the sum
-      dm_dist /= float(n_dm_samples);
-      // recalculate to meters from mm
-      dm_dist /= 1000.0;
+      // order the first n elements (up to the median)
+      std::nth_element(std::begin(dists), std::begin(dists) + dists.size()/2, std::end(dists));
+      const float median = dists[dists.size()/2]/1000.0f;
+      return median;
     } else
     {
-      dm_dist = std::numeric_limits<float>::quiet_NaN();
+      return std::numeric_limits<float>::quiet_NaN();
     }
-    return dm_dist;
   }
   //}
 
@@ -529,8 +521,6 @@ namespace object_detect
     // LOAD STATIC PARAMETERS
     ROS_INFO("[%s]: Loading static parameters:", m_node_name.c_str());
     // Load the detection parameters
-    pl.load_param("object_radius", m_object_radius, -1.0);
-    m_object_radius_known = m_object_radius > 0;
     pl.load_param("max_dist", m_max_dist);
     pl.load_param("max_dist_diff", m_max_dist_diff);
     pl.load_param("min_depth", m_min_depth);
