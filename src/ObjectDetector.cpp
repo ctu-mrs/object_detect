@@ -157,7 +157,7 @@ namespace object_detect
         if (resulting_distance_quality > dist_qual_t::no_estimate)
         {
           /* Calculate the estimated position of the object //{ */
-          const Eigen::Vector3f pos_vec = resulting_distance * (l_vec + r_vec) / 2.0;
+          const Eigen::Vector3f pos_vec = resulting_distance * ((l_vec + r_vec) / 2.0).normalized();
           cout << "Estimated location (camera CS): [" << pos_vec(0) << ", " << pos_vec(1) << ", " << pos_vec(2) << "]" << std::endl;
           ball.position = pos_vec;
           /* cout << "Estimated location (camera CS): [" << ball.position(0) << ", " << ball.position(1) << ", " << ball.position(2) << "]" << std::endl; */
