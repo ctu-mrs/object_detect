@@ -9,7 +9,7 @@
   <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
   <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
 
-  <arg name="color_image" value="rs_d435/color/image_rect_color"/>
+  <arg name="color_image" value="rs_d435/color/image_raw"/>
   <arg name="color_cinfo" value="rs_d435/color/camera_info"/>
   <arg name="depthmap_image" value="rs_d435/aligned_depth_to_color/image_raw"/>
   <arg name="depthmap_cinfo" value="rs_d435/aligned_depth_to_color/camera_info"/>
@@ -36,8 +36,8 @@
       <remap from="~rgb_camera_info" to="$(arg color_cinfo)" />
 
       <remap from="~debug_image" to="~debug_image" />
-      <remap from="~detected_objects_pcl" to="~detected_objects_pcl" />
-      <remap from="~detected_objects" to="~detected_objects" />
+      <remap from="~detected_objects_pcl" to="~detected_balls_pcl" />
+      <remap from="~detected_objects" to="~detected_balls" />
 
     </node>
   

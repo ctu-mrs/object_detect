@@ -606,8 +606,8 @@ namespace object_detect
   
     image_transport::ImageTransport it(nh);
     m_pub_debug = it.advertise("debug_image", 1);
-    m_pub_pcl = nh.advertise<sensor_msgs::PointCloud>("detected_objects_pcl", 10);
-    m_pub_det = nh.advertise<object_detect::BallDetections>("detected_objects", 10);
+    m_pub_pcl = nh.advertise<sensor_msgs::PointCloud>("detected_balls_pcl", 10);
+    m_pub_det = nh.advertise<object_detect::BallDetections>("detected_balls", 10);
 
     m_ball_change_server = nh.advertiseService("change_balls", &ObjectDetector::ball_change_callback, this);
     m_ball_query_server = nh.advertiseService("query_balls", &ObjectDetector::ball_query_callback, this);
