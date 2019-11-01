@@ -62,6 +62,7 @@ namespace object_detect
       }
       //}
 
+      /* get ball candidates //{ */
       std::vector<BallCandidate> balls;
       {
         std::scoped_lock<std::mutex> lck(m_active_ball_types_mtx);
