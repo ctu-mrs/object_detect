@@ -532,49 +532,58 @@ namespace object_detect
     /* load covariance coefficients //{ */
     
     // admittedly a pretty fcking overcomplicated way to do this, but I'm home bored, so whatever
-    {
-      std::map<std::string, double> cov_coeffs_xy = pl.load_param2<std::map<std::string, double>>("cov_coeffs/xy");
-      std::map<std::string, double> cov_coeffs_z = pl.load_param2<std::map<std::string, double>>("cov_coeffs/z");
-      std::map<dist_qual_t, double> loaded_vals_xy;
-      for (const auto& keyval : cov_coeffs_xy)
-      {
-        int val;
-        if ((val = dist_qual_id(keyval.first)) == dist_qual_t::unknown_qual)
-        {
-          ROS_ERROR("[%s]: Unknwown distance estimation quality key: '%s'! Skipping.", m_node_name.c_str(), keyval.first.c_str());
-          continue;
-        }
-        dist_qual_t enval = (dist_qual_t)val;
-        loaded_vals_xy.insert({enval, keyval.second});
-      }
-      std::map<dist_qual_t, double> loaded_vals_z;
-      for (const auto& keyval : cov_coeffs_z)
-      {
-        int val;
-        if ((val = dist_qual_id(keyval.first)) == dist_qual_t::unknown_qual)
-        {
-          ROS_ERROR("[%s]: Unknwown distance estimation quality key: '%s'! Skipping.", m_node_name.c_str(), keyval.first.c_str());
-          continue;
-        }
-        dist_qual_t enval = (dist_qual_t)val;
-        loaded_vals_z.insert({enval, keyval.second});
-      }
-      for (const auto& keyval : loaded_vals_xy)
-      {
-        auto it = std::end(loaded_vals_z);
-        if ((it = loaded_vals_z.find(keyval.first)) == std::end(loaded_vals_z))
-        {
-          ROS_ERROR("[%s]: Distance estimation quality key '%s' was specified for xy but not for z! Skipping.", m_node_name.c_str(), dist_qual_name(keyval.first).c_str());
-          continue;
-        }
-        m_cov_coeffs.insert({keyval.first, {keyval.second, it->second}});
-        ROS_INFO("[%s]: Inserting xyz coeffs: [%.2f, %.2f, %.2f].", m_node_name.c_str(), keyval.second, keyval.second, it->second);
-      }
-      for (const auto& keyval : loaded_vals_z)
-        if (loaded_vals_xy.find(keyval.first) == std::end(loaded_vals_xy))
-          ROS_ERROR("[%s]: Distance estimation quality key '%s' was specified for xy but not for z! Skipping.", m_node_name.c_str(), dist_qual_name(keyval.first).c_str());
-          // just warn the user, not much else we can do
-    }
+    std::pair<double&, double&> cov_coeffs_no_estimate = {m_drmgr_ptr->config.cov_coeffs__xy__no_estimate, m_drmgr_ptr->config.cov_coeffs__z__no_estimate};
+    std::pair<double&, double&> cov_coeffs_blob_size = {m_drmgr_ptr->config.cov_coeffs__xy__blob_size, m_drmgr_ptr->config.cov_coeffs__z__blob_size};
+    std::pair<double&, double&> cov_coeffs_depthmap = {m_drmgr_ptr->config.cov_coeffs__xy__depthmap, m_drmgr_ptr->config.cov_coeffs__z__depthmap};
+    std::pair<double&, double&> cov_coeffs_both = {m_drmgr_ptr->config.cov_coeffs__xy__both, m_drmgr_ptr->config.cov_coeffs__z__both};
+    m_cov_coeffs.insert({dist_qual_t::no_estimate, cov_coeffs_no_estimate});
+    m_cov_coeffs.insert({dist_qual_t::blob_size, cov_coeffs_blob_size});
+    m_cov_coeffs.insert({dist_qual_t::depthmap, cov_coeffs_depthmap});
+    m_cov_coeffs.insert({dist_qual_t::both, cov_coeffs_both});
+    
+    /* { */
+    /*   std::map<std::string, double> cov_coeffs_xy = pl.load_param2<std::map<std::string, double>>("cov_coeffs/xy"); */
+    /*   std::map<std::string, double> cov_coeffs_z = pl.load_param2<std::map<std::string, double>>("cov_coeffs/z"); */
+    /*   std::map<dist_qual_t, double> loaded_vals_xy; */
+    /*   for (const auto& keyval : cov_coeffs_xy) */
+    /*   { */
+    /*     int val; */
+    /*     if ((val = dist_qual_id(keyval.first)) == dist_qual_t::unknown_qual) */
+    /*     { */
+    /*       ROS_ERROR("[%s]: Unknwown distance estimation quality key: '%s'! Skipping.", m_node_name.c_str(), keyval.first.c_str()); */
+    /*       continue; */
+    /*     } */
+    /*     dist_qual_t enval = (dist_qual_t)val; */
+    /*     loaded_vals_xy.insert({enval, keyval.second}); */
+    /*   } */
+    /*   std::map<dist_qual_t, double> loaded_vals_z; */
+    /*   for (const auto& keyval : cov_coeffs_z) */
+    /*   { */
+    /*     int val; */
+    /*     if ((val = dist_qual_id(keyval.first)) == dist_qual_t::unknown_qual) */
+    /*     { */
+    /*       ROS_ERROR("[%s]: Unknwown distance estimation quality key: '%s'! Skipping.", m_node_name.c_str(), keyval.first.c_str()); */
+    /*       continue; */
+    /*     } */
+    /*     dist_qual_t enval = (dist_qual_t)val; */
+    /*     loaded_vals_z.insert({enval, keyval.second}); */
+    /*   } */
+    /*   for (const auto& keyval : loaded_vals_xy) */
+    /*   { */
+    /*     auto it = std::end(loaded_vals_z); */
+    /*     if ((it = loaded_vals_z.find(keyval.first)) == std::end(loaded_vals_z)) */
+    /*     { */
+    /*       ROS_ERROR("[%s]: Distance estimation quality key '%s' was specified for xy but not for z! Skipping.", m_node_name.c_str(), dist_qual_name(keyval.first).c_str()); */
+    /*       continue; */
+    /*     } */
+    /*     m_cov_coeffs.insert({keyval.first, {keyval.second, it->second}}); */
+    /*     ROS_INFO("[%s]: Inserting xyz coeffs: [%.2f, %.2f, %.2f].", m_node_name.c_str(), keyval.second, keyval.second, it->second); */
+    /*   } */
+    /*   for (const auto& keyval : loaded_vals_z) */
+    /*     if (loaded_vals_xy.find(keyval.first) == std::end(loaded_vals_xy)) */
+    /*       ROS_ERROR("[%s]: Distance estimation quality key '%s' was specified for xy but not for z! Skipping.", m_node_name.c_str(), dist_qual_name(keyval.first).c_str()); */
+    /*       // just warn the user, not much else we can do */
+    /* } */
     
     //}
 

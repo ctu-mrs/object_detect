@@ -160,7 +160,7 @@ namespace object_detect
       std::vector<BallTypePtr> m_ball_types;
       std::mutex m_active_ball_types_mtx;
       std::vector<BallTypePtr> m_active_ball_types;
-      std::map<dist_qual_t, std::pair<double, double>> m_cov_coeffs;
+      std::map<dist_qual_t, std::pair<double&, double&>> m_cov_coeffs;
       //}
 
       /* ROS related variables (subscribers, timers etc.) //{ */
