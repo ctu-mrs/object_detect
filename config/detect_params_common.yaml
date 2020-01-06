@@ -18,14 +18,14 @@ use_ocl: true # whether to use OpenCL hardware acceleration
 cov_coeffs:
   xy:
     no_estimate: 2.5
-    blob_size:   1.2
-    depthmap:    1.0
-    both:        0.8
+    blob_size:   0.03
+    depthmap:    0.02
+    both:        0.01
   z:
     no_estimate: 666.0
-    blob_size:   6.0
-    depthmap:    3.0
-    both:        2.5
+    blob_size:   0.01
+    depthmap:    0.01
+    both:        0.01
 
 ############### Default parameters for the dynamic reconfigure ################
 blob_radius_method: 1
