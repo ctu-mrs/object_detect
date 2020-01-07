@@ -76,9 +76,7 @@ namespace object_detect
       //}
 
       /* Calculate 3D positions of the detected balls //{ */
-      vector<geometry_msgs::Point32> positions;
       vector<dist_qual_t> distance_qualities;
-      positions.reserve(balls.size());
 
       for (size_t it = 0; it < balls.size(); it++)
       {
@@ -163,15 +161,6 @@ namespace object_detect
           ball.position = pos_vec;
           /* cout << "Estimated location (camera CS): [" << ball.position(0) << ", " << ball.position(1) << ", " << ball.position(2) << "]" << std::endl; */
           //}
-
-          /* If all is OK, add the position to the vector //{ */
-          geometry_msgs::Point32 cur_pos;
-          cur_pos.x = pos_vec(0);
-          cur_pos.y = pos_vec(1);
-          cur_pos.z = pos_vec(2);
-          positions.push_back(cur_pos);
-          distance_qualities.push_back(resulting_distance_quality);
-          //}
         }
         ball.dist_qual = resulting_distance_quality;
 
@@ -190,14 +179,35 @@ namespace object_detect
       /* Publish all the calculated valid positions //{ */
       if (m_pub_pcl.getNumSubscribers() > 0)
       {
-        sensor_msgs::PointCloud pcl_msg;
+        sensor_msgs::PointCloud2 pcl_msg;
         pcl_msg.header = rgb_img_msg->header;
-        pcl_msg.points = positions;
 
-        sensor_msgs::ChannelFloat32 chl_msg;
-        chl_msg.name = "distance_quality"s;
-        chl_msg.values = std::vector<float>(std::begin(distance_qualities), std::end(distance_qualities));
-        pcl_msg.channels.push_back(chl_msg);
+        sensor_msgs::PointCloud2Modifier mdf(pcl_msg);
+        mdf.resize(balls.size());
+        mdf.setPointCloud2Fields(5,
+            "x", 1, sensor_msgs::PointField::FLOAT32,
+            "y", 1, sensor_msgs::PointField::FLOAT32,
+            "z", 1, sensor_msgs::PointField::FLOAT32,
+            "type", 1, sensor_msgs::PointField::INT16,
+            "distance_quality", 1, sensor_msgs::PointField::INT8
+            );
+
+        sensor_msgs::PointCloud2Iterator<float> iter_x(pcl_msg, "x");
+        sensor_msgs::PointCloud2Iterator<float> iter_y(pcl_msg, "y");
+        sensor_msgs::PointCloud2Iterator<float> iter_z(pcl_msg, "z");
+        sensor_msgs::PointCloud2Iterator<int16_t> iter_type(pcl_msg, "type");
+        sensor_msgs::PointCloud2Iterator<int8_t> iter_dist_qual(pcl_msg, "distance_quality");
+
+        for (size_t it = 0; it < balls.size(); ++it, ++iter_x, ++iter_y, ++iter_z, ++iter_type, ++iter_dist_qual)
+        {
+          const auto& ball = balls.at(it);
+          cerr << "adding position to pcl: " << ball.position << std::endl;
+          *iter_x = ball.position.x();
+          *iter_y = ball.position.y();
+          *iter_z = ball.position.z();
+          *iter_type = ball.type->seg_conf->color_id;
+          *iter_dist_qual = ball.dist_qual;
+        }
 
         m_pub_pcl.publish(pcl_msg);
       }
@@ -616,7 +626,7 @@ namespace object_detect
   
     image_transport::ImageTransport it(nh);
     m_pub_debug = it.advertise("debug_image", 1);
-    m_pub_pcl = nh.advertise<sensor_msgs::PointCloud>("detected_balls_pcl", 10);
+    m_pub_pcl = nh.advertise<sensor_msgs::PointCloud2>("detected_balls_pcl", 10);
     m_pub_det = nh.advertise<object_detect::BallDetections>("detected_balls", 10);
 
     m_ball_change_server = nh.advertiseService("change_balls", &ObjectDetector::ball_change_callback, this);
