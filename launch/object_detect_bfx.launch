@@ -1,0 +1,42 @@
+<launch>
+
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+
+  <arg name="debug" default="false" />
+  <arg unless="$(arg debug)" name="launch_prefix_debug" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix_debug" value="debug_roslaunch"/>
+  <arg name="profile" default="false" />
+  <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
+  <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
+
+  <arg name="color_image" value="bluefox_front/image_raw"/>
+  <arg name="color_cinfo" value="bluefox_front/camera_info"/>
+
+  <arg name="standalone" default="true" />
+  <arg name="manager" default="object_detect_nodelet_manager" />
+  <arg name="nodelet_name" value="object_detect/ObjectDetector" />
+  <arg unless="$(arg standalone)" name="nodelet_load" value="load $(arg nodelet_name) $(arg manager)"/>
+  <arg     if="$(arg standalone)" name="nodelet_load" value="standalone $(arg nodelet_name)"/>
+
+  <group ns="$(arg uav_name)">
+
+    <node pkg="nodelet" type="nodelet" name="object_detect_bfx" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" >
+      
+      <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
+      <rosparam file="$(find object_detect)/config/balls/Red.yaml" />
+      <param name="uav_name" value="$(arg uav_name)" />
+
+      <param name="ocl_lut_kernel_file" value="$(find object_detect)/src/ocl_lut_kernel.cl" />
+
+      <remap from="~rgb_image" to="$(arg color_image)" />
+      <remap from="~rgb_camera_info" to="$(arg color_cinfo)" />
+
+      <remap from="~debug_image" to="~debug_image" />
+      <remap from="~detected_objects_pcl" to="~detected_balls_pcl" />
+      <remap from="~detected_objects" to="~detected_balls" />
+
+    </node>
+  
+  </group>
+
+</launch>
