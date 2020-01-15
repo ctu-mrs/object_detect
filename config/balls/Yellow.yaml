@@ -1,4 +1,4 @@
-binarization_method: HSV
+binarization_method_name: HSV
 hsv: {
   hue_center: 30, hue_range: 20,
   sat_center: 255, sat_range: 256,

@@ -478,22 +478,29 @@ namespace object_detect
     pl.load_param("max_dist_diff", m_max_dist_diff);
     pl.load_param("min_depth", m_min_depth);
     pl.load_param("max_depth", m_max_depth);
-    std::string ocl_lut_kernel_file = pl.load_param2<std::string>("ocl_lut_kernel_file");
-    bool use_ocl = pl.load_param2<bool>("use_ocl");
+    const std::string ocl_lut_kernel_file = pl.load_param2<std::string>("ocl_lut_kernel_file");
+    const bool use_ocl = pl.load_param2<bool>("use_ocl");
 
     /* load covariance coefficients //{ */
     
     // admittedly a pretty fcking overcomplicated way to do this, but I'm home bored, so whatever
-    std::pair<double&, double&> cov_coeffs_no_estimate = {m_drmgr_ptr->config.cov_coeffs__xy__no_estimate, m_drmgr_ptr->config.cov_coeffs__z__no_estimate};
-    std::pair<double&, double&> cov_coeffs_blob_size = {m_drmgr_ptr->config.cov_coeffs__xy__blob_size, m_drmgr_ptr->config.cov_coeffs__z__blob_size};
-    std::pair<double&, double&> cov_coeffs_depthmap = {m_drmgr_ptr->config.cov_coeffs__xy__depthmap, m_drmgr_ptr->config.cov_coeffs__z__depthmap};
-    std::pair<double&, double&> cov_coeffs_both = {m_drmgr_ptr->config.cov_coeffs__xy__both, m_drmgr_ptr->config.cov_coeffs__z__both};
+    const std::pair<double&, double&> cov_coeffs_no_estimate = {m_drmgr_ptr->config.cov_coeffs__xy__no_estimate, m_drmgr_ptr->config.cov_coeffs__z__no_estimate};
+    const std::pair<double&, double&> cov_coeffs_blob_size = {m_drmgr_ptr->config.cov_coeffs__xy__blob_size, m_drmgr_ptr->config.cov_coeffs__z__blob_size};
+    const std::pair<double&, double&> cov_coeffs_depthmap = {m_drmgr_ptr->config.cov_coeffs__xy__depthmap, m_drmgr_ptr->config.cov_coeffs__z__depthmap};
+    const std::pair<double&, double&> cov_coeffs_both = {m_drmgr_ptr->config.cov_coeffs__xy__both, m_drmgr_ptr->config.cov_coeffs__z__both};
     m_cov_coeffs.insert({dist_qual_t::no_estimate, cov_coeffs_no_estimate});
     m_cov_coeffs.insert({dist_qual_t::blob_size, cov_coeffs_blob_size});
     m_cov_coeffs.insert({dist_qual_t::depthmap, cov_coeffs_depthmap});
     m_cov_coeffs.insert({dist_qual_t::both, cov_coeffs_both});
     
     //}
+
+    const std::string bin_method_str = pl.load_param2<std::string>("binarization_method_name");
+    const std::string segment_color = pl.load_param2<std::string>("segment_color_name");
+    m_drmgr_ptr->config.binarization_method = binarization_method_id(bin_method_str);
+    m_drmgr_ptr->config.segment_color = color_id(segment_color);
+    m_drmgr_ptr->config.override_settings = false;
+    m_drmgr_ptr->update_config();
 
     double loop_rate = pl.load_param2<double>("loop_rate", 100);
 
