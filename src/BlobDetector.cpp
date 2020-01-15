@@ -9,14 +9,6 @@ using namespace object_detect;
 std::string get_ocl_vendor(const cv::ocl::Device& ocl_device)
 {
   return ocl_device.vendorName();
-  /* std::string ret = "unknown"; */
-  /* if (ocl_device.isIntel()) */
-  /*   ret = "Intel"; */
-  /* if (ocl_device.isAMD()) */
-  /*   ret = "AMD"; */
-  /* if (ocl_device.isNVidia()) */
-  /*   ret = "NVidia"; */
-  /* return ret; */
 }
 
 std::string get_ocl_type(const cv::ocl::Device& ocl_device)
@@ -279,99 +271,84 @@ void BlobDetector::preprocess_image(cv::Mat& inout_img) const
 }
 //}
 
-/* BlobDetector::detect_lut() method //{ */
-std::vector<BallCandidate> BlobDetector::detect_lut(cv::Mat in_img, const std::vector<BallTypePtr>& ball_types, cv::OutputArray p_labels_img)
+/* BlobDetector::detect_candidates() method //{ */
+std::vector<BallCandidate> BlobDetector::detect_candidates(cv::Mat in_img, cv::OutputArray p_labels_img)
 {
 #ifdef ENABLE_PROFILING
   ros::WallTime t_start = ros::WallTime::now();
 #endif
-  std::vector<BallCandidate> balls;
   preprocess_image(in_img);
 #ifdef ENABLE_PROFILING
   ros::WallTime t_preprocess = ros::WallTime::now();
 #endif
-  std::vector<uint8_t> labels;
-  labels.reserve(ball_types.size());
-  for (const auto& ball_type : ball_types)
-    labels.push_back(ball_type->seg_conf->color_id);
-  cv::Mat bin_imgs;
 
-  bool ocl_success = false;
-  if (m_use_ocl)
-    ocl_success = segment_image_ocl(in_img, m_ulut, labels, bin_imgs, p_labels_img);
-  if (!ocl_success)
-    segment_image(in_img, m_lut, labels, bin_imgs, p_labels_img);
+  cv::Mat seg_img;
+  if (m_drcfg.override_settings)
+    seg_img = segment_ranges(in_img, p_labels_img);
+  else
+    seg_img = segment_lut(in_img, p_labels_img);
 
-#ifdef ENABLE_PROFILING
-  ros::WallTime t_segment = ros::WallTime::now();
-#endif
-
-  for (size_t it = 0; it < ball_types.size(); it++)
+  const uint8_t label = (uint8_t)m_drcfg.segment_color;
+  postprocess_binary_image(seg_img);
+  const std::vector<Blob> blobs = find_blobs(seg_img, label);
+  const auto balls = blobs_to_balls(blobs);
+  if (p_labels_img.needed())
   {
-    const auto& ball_type = ball_types.at(it);
-    const auto& seg_conf = ball_type->seg_conf;
-    cv::Mat binary_img = bin_imgs(cv::Rect(it*in_img.cols*in_img.rows, 0, in_img.cols*in_img.rows, 1)).reshape(0, in_img.rows);
-    postprocess_binary_image(binary_img);
-    const std::vector<Blob> blobs = find_blobs(binary_img, seg_conf->color_id);
-    const auto cur_balls = blobs_to_balls(blobs, ball_type);
-    balls.insert(std::end(balls), std::begin(cur_balls), std::end(cur_balls)); 
+    const cv::Mat tmp_img = seg_img/255*label;
+    cv::bitwise_or(p_labels_img, tmp_img, p_labels_img);
   }
+
 #ifdef ENABLE_PROFILING
   ros::WallTime t_finish = ros::WallTime::now();
   const std::string ocl_str = ocl_success ? " (with OpenCL)" : "";
   const double preproc_ms = (t_preprocess - t_start).toSec()*1000.0;
-  const double segment_ms = (t_segment - t_preprocess).toSec()*1000.0;
+  /* const double segment_ms = (t_segment - t_preprocess).toSec()*1000.0; */
   const double fblobs_ms = (t_findblobs - t_finish).toSec()*1000.0;
   const double total_ms = (m_t_finish - t_start).toSec()*1000.0;
-  ROS_INFO("[BlobDetector]: profiling%s\n\tpreproc:\t%.2f\n\tsegment:\t%.2f\n\tfblobs:\t%.2f\n\tfinish:%.2f\n\ttotal:%.2f", ocl_str.c_str(), preproc_ms, segment_ms, fblobs_ms, finish_ms, total_ms);
+  ROS_INFO("[BlobDetector]: profiling%s\n\tpreproc:\t%.2f\n\tfblobs:\t%.2f\n\tfinish:%.2f\n\ttotal:%.2f", ocl_str.c_str(), preproc_ms, segment_ms, finish_ms, total_ms);
 #endif
   return balls;
 }
 //}
 
-/* BlobDetector::detect() method //{ */
-std::vector<BallCandidate> BlobDetector::detect(cv::Mat in_img, const std::vector<BallTypePtr>& ball_types, cv::OutputArray p_labels_img)
+/* BlobDetector::segment_lut() method //{ */
+cv::Mat BlobDetector::segment_lut(cv::Mat in_img, cv::OutputArray p_labels_img)
 {
-  std::vector<BallCandidate> balls;
-  preprocess_image(in_img);
+  const uint8_t label = (uint8_t)m_drcfg.segment_color;
+  std::vector<uint8_t> labels = {label};
+  cv::Mat bin_imgs;
+
+  bool ocl_success = false;
+  if (m_use_ocl)
+    ocl_success = segment_image_lut_ocl(in_img, m_ulut, labels, bin_imgs, p_labels_img);
+  if (!ocl_success)
+    segment_image_lut_cpu(in_img, m_lut, labels, bin_imgs, p_labels_img);
+
+  cv::Mat binary_img = bin_imgs(in_img).reshape(0, in_img.rows);
+  return binary_img;
+}
+//}
+
+/* BlobDetector::segment_ranges() method //{ */
+cv::Mat BlobDetector::segment_ranges(cv::Mat in_img, cv::OutputArray p_labels_img)
+{
   p_labels_img.create(in_img.size(), CV_8UC1);
   p_labels_img.setTo(0);
 
-  cv::Mat hsv_img;
+  cv::Mat seg_img;
+  if (m_drcfg.binarization_method == bin_method_t::hsv)
   {
-    bool use_hsv = false;
-    for (const auto& ball_type : ball_types)
-      use_hsv = use_hsv || ball_type->seg_conf->method == bin_method_t::hsv;
-    if (use_hsv)
-      cv::cvtColor(in_img, hsv_img, cv::COLOR_BGR2HSV);
+    cv::Mat prep_img;
+    cv::cvtColor(in_img, prep_img, cv::COLOR_BGR2HSV);
+    seg_img = threshold_hsv(prep_img);
   }
-
-  cv::Mat lab_img;
+  else
   {
-    bool use_lab = false;
-    for (const auto& ball_type : ball_types)
-      use_lab = use_lab || ball_type->seg_conf->method == bin_method_t::lab;
-    if (use_lab)
-      cv::cvtColor(in_img, lab_img, cv::COLOR_BGR2Lab);
+    cv::Mat prep_img;
+    cv::cvtColor(in_img, prep_img, cv::COLOR_BGR2Lab);
+    seg_img = threshold_lab(prep_img);
   }
-
-  for (const auto& ball_type : ball_types)
-  {
-    const auto& seg_conf = ball_type->seg_conf;
-    cv::Mat binary_img = binarize_image(hsv_img, lab_img, seg_conf);
-    if (binary_img.empty()) // in case of invalid binarization method (shouldn't happen)
-      continue;
-    postprocess_binary_image(binary_img);
-    const std::vector<Blob> blobs = find_blobs(binary_img, seg_conf->color_id);
-    const auto cur_balls = blobs_to_balls(blobs, ball_type);
-    balls.insert(std::end(balls), std::begin(cur_balls), std::end(cur_balls)); 
-    if (p_labels_img.needed())
-    {
-      const cv::Mat tmp_img = binary_img/255*seg_conf->color_id;
-      cv::bitwise_or(p_labels_img, tmp_img, p_labels_img);
-    }
-  }
-  return balls;
+  return seg_img;
 }
 //}
 
@@ -406,32 +383,11 @@ void BlobDetector::postprocess_binary_image(cv::Mat binary_img) const
 }
 //}
 
-/* BlobDetector::binarize_image() method //{ */
-cv::Mat BlobDetector::binarize_image(cv::Mat hsv_img, cv::Mat lab_img, const SegConfPtr seg_conf) const
-{
-  cv::Mat binary_img;
-  switch (seg_conf->method)
-  {
-    case bin_method_t::hsv:
-      binary_img = threshold_hsv(hsv_img, seg_conf);
-      break;
-    case bin_method_t::lab:
-      binary_img = threshold_lab(lab_img, seg_conf);
-      break;
-    case bin_method_t::unknown_method:
-      ROS_ERROR("[BlobDetector]: unknown binarization method selected - cannot perform detection!");
-      return binary_img;
-  }
-
-  return binary_img;
-}
-//}
-
 /* BlobDetector::threshold_hsv() method //{ */
-cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img, const SegConfPtr seg_conf) const
+cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img) const
 {
-  double hue_lower = seg_conf->hue_center - seg_conf->hue_range / 2.0;
-  double hue_higher = seg_conf->hue_center + seg_conf->hue_range / 2.0;
+  double hue_lower = m_drcfg.hsv__hue_center - m_drcfg.hsv__hue_range / 2.0;
+  double hue_higher = m_drcfg.hsv__hue_center + m_drcfg.hsv__hue_range / 2.0;
   bool overflow;
   /* calculate the correct bounds for the pixel HSV values //{ */
   {
@@ -449,11 +405,11 @@ cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img, const SegConfPtr seg_conf) 
   }
   //}
 
-  double sat_lower = seg_conf->sat_center - seg_conf->sat_range / 2.0;
-  double sat_higher = seg_conf->sat_center + seg_conf->sat_range / 2.0;
+  double sat_lower = m_drcfg.hsv__sat_center - m_drcfg.hsv__sat_range / 2.0;
+  double sat_higher = m_drcfg.hsv__sat_center + m_drcfg.hsv__sat_range / 2.0;
 
-  double val_lower = seg_conf->val_center - seg_conf->val_range / 2.0;
-  double val_higher = seg_conf->val_center + seg_conf->val_range / 2.0;
+  double val_lower = m_drcfg.hsv__val_center - m_drcfg.hsv__val_range / 2.0;
+  double val_higher = m_drcfg.hsv__val_center + m_drcfg.hsv__val_range / 2.0;
 
   cv::Mat binary_img;
   // filter the HSV image by color
@@ -494,16 +450,16 @@ cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img, const SegConfPtr seg_conf) 
 //}
 
 /* BlobDetector::threshold_lab() method //{ */
-cv::Mat BlobDetector::threshold_lab(cv::Mat lab_img, const SegConfPtr seg_conf) const
+cv::Mat BlobDetector::threshold_lab(cv::Mat lab_img) const
 {
-  double l_lower = seg_conf->l_center - seg_conf->l_range / 2.0;
-  double l_higher = seg_conf->l_center + seg_conf->l_range / 2.0;
+  double l_lower = m_drcfg.lab__l_center - m_drcfg.lab__l_range / 2.0;
+  double l_higher = m_drcfg.lab__l_center + m_drcfg.lab__l_range / 2.0;
 
-  double a_lower = seg_conf->a_center - seg_conf->a_range / 2.0;
-  double a_higher = seg_conf->a_center + seg_conf->a_range / 2.0;
+  double a_lower = m_drcfg.lab__a_center - m_drcfg.lab__a_range / 2.0;
+  double a_higher = m_drcfg.lab__a_center + m_drcfg.lab__a_range / 2.0;
 
-  double b_lower = seg_conf->b_center - seg_conf->b_range / 2.0;
-  double b_higher = seg_conf->b_center + seg_conf->b_range / 2.0;
+  double b_lower = m_drcfg.lab__b_center - m_drcfg.lab__b_range / 2.0;
+  double b_higher = m_drcfg.lab__b_center + m_drcfg.lab__b_range / 2.0;
 
   cv::Mat binary_img;
   // filter the Lab image by color
@@ -572,8 +528,8 @@ class parallelSegment : public ParallelLoopBody
 
 //}
 
-/* BlobDetector::segment_image() method //{ */
-bool BlobDetector::segment_image(cv::InputArray p_in_img, cv::InputArray p_lut, cv::InputArray p_labels, cv::OutputArray p_bin_imgs, cv::OutputArray p_labels_img)
+/* BlobDetector::segment_image_lut_cpu() method //{ */
+bool BlobDetector::segment_image_lut_cpu(cv::InputArray p_in_img, cv::InputArray p_lut, cv::InputArray p_labels, cv::OutputArray p_bin_imgs, cv::OutputArray p_labels_img)
 {
   const cv::Mat in_img = p_in_img.getMat();
   const int in_img_len = in_img.cols*in_img.rows;
@@ -660,14 +616,14 @@ bool BlobDetector::bitwise_and_ocl(uint8_t value, cv::InputArray p_in_img, cv::O
 //}
 
 /* blobs_to_balls() method //{ */
-std::vector<BallCandidate> BlobDetector::blobs_to_balls(const std::vector<Blob>& blobs, const BallTypePtr ball_type)
+std::vector<BallCandidate> BlobDetector::blobs_to_balls(const std::vector<Blob>& blobs)
 {
   std::vector<BallCandidate> ret;
   ret.reserve(blobs.size());
   for (const auto& blob : blobs)
   {
     BallCandidate ball;
-    ball.type = ball_type;
+    ball.type = m_drcfg.segment_color;
     ball.location = blob.location;
     ball.radius = blob.radius;
     ret.push_back(ball);
@@ -676,8 +632,8 @@ std::vector<BallCandidate> BlobDetector::blobs_to_balls(const std::vector<Blob>&
 }
 //}
 
-/* BlobDetector::segment_image_ocl() method //{ */
-bool BlobDetector::segment_image_ocl(cv::InputArray p_in_img, cv::InputArray p_lut, cv::InputArray p_labels, cv::OutputArray p_bin_imgs, cv::OutputArray p_labels_img)
+/* BlobDetector::segment_image_lut_ocl() method //{ */
+bool BlobDetector::segment_image_lut_ocl(cv::InputArray p_in_img, cv::InputArray p_lut, cv::InputArray p_labels, cv::OutputArray p_bin_imgs, cv::OutputArray p_labels_img)
 {
   cv::UMat labels = p_labels.getUMat();
   const int labels_len = labels.cols;

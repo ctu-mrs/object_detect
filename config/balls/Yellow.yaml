@@ -1,0 +1,15 @@
+red:
+  binarization_method: HSV
+  hsv: {
+    hue_center: 20, hue_range: 20,
+    sat_center: 128, sat_range: 256,
+    val_center: 128, val_range: 256
+    }
+  lab: {a_center: 173.13601532567048, a_range: 29.579620014972786, b_center: 99.29150702426564,
+    b_range: 30.96752501725443, l_center: 101.15453384418902, l_range: 182.87309050056473}
+  physical_radius: 0.075
+  # hsv: {hue_center: 150.08505304598148, hue_range: 26.923336609347146, sat_center: 149.42337164750958,
+  #   sat_range: 108.22574370244425, val_center: 145.21008939974456, val_range: 258.58160953488886}
+  # lab: {a_center: 173.13601532567048, a_range: 29.579620014972786, b_center: 99.29150702426564,
+  #   b_range: 30.96752501725443, l_center: 101.15453384418902, l_range: 182.87309050056473}
+  # physical_radius: 0.075

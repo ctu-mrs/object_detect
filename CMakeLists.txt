@@ -46,13 +46,6 @@ add_message_files(
    BallDetections.msg
  )
 
-#Generate services in the 'srv' folder
-add_service_files(
-   FILES
-   BallChange.srv
-   BallQuery.srv
- )
-
 ## Generate added messages and services with any dependencies listed here
  generate_messages(
    DEPENDENCIES
@@ -107,7 +100,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
 #   ${OpenCV_LIBRARIES}
 # )
 
-add_library(ObjectDetector src/ObjectDetector.cpp src/BlobDetector.cpp src/BallCandidate.cpp src/utility_fcs.cpp src/SegConf.cpp src/color_mapping.cpp)
+add_library(ObjectDetector src/ObjectDetector.cpp src/BlobDetector.cpp src/BallCandidate.cpp src/utility_fcs.cpp src/lut.cpp src/color_mapping.cpp)
 add_dependencies(ObjectDetector
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}

@@ -48,13 +48,11 @@
 // Includes from this package
 #include <object_detect/BallDetections.h>
 #include <object_detect/DetectionParamsConfig.h>
-#include <object_detect/BallChange.h>
-#include <object_detect/BallQuery.h>
-#include "object_detect/BallType.h"
 #include "object_detect/BallCandidate.h"
 #include "object_detect/BlobDetector.h"
 #include "object_detect/utility_fcs.h"
 #include "object_detect/color_mapping.h"
+#include "object_detect/lut.h"
 
 //}
 
@@ -138,11 +136,7 @@ namespace object_detect
       static ros_cov_t generate_covariance(const Eigen::Vector3f& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);
-      BallTypePtr load_ball_type(mrs_lib::ParamLoader& pl, const std::string& cfg_name);
-      std::vector<BallTypePtr> load_ball_types(mrs_lib::ParamLoader& pl, const std::vector<std::string>& color_strs);
       void highlight_mask(cv::Mat& img, cv::Mat label_img);
-      bool ball_change_callback(object_detect::BallChange::Request& req, object_detect::BallChange::Response& resp);
-      bool ball_query_callback([[maybe_unused]] object_detect::BallQuery::Request& req, object_detect::BallQuery::Response& resp);
 
     private:
       // --------------------------------------------------------------
@@ -158,9 +152,6 @@ namespace object_detect
       double m_min_depth;
       double m_max_depth;
       std::string m_ocl_lut_kernel_file;
-      std::vector<BallTypePtr> m_ball_types;
-      std::mutex m_active_ball_types_mtx;
-      std::vector<BallTypePtr> m_active_ball_types;
       std::map<dist_qual_t, std::pair<double&, double&>> m_cov_coeffs;
       //}
 
@@ -175,9 +166,6 @@ namespace object_detect
       ros::Publisher m_pub_det;
       ros::Publisher m_pub_pcl;
       image_transport::Publisher m_pub_debug;
-
-      ros::ServiceServer m_ball_change_server;
-      ros::ServiceServer m_ball_query_server;
 
       ros::Timer m_main_loop_timer;
       //}
@@ -207,7 +195,7 @@ namespace object_detect
       // Checks whether a calculated distance is valid
       bool distance_valid(float distance);
       // Estimates distance of an object based on the 3D vectors pointing to its edges and known distance between those edges
-      float estimate_distance_from_known_size(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float known_size);
+      float estimate_distance_from_known_diameter(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float known_diameter);
       // Estimates distance based on information from a depthmap, masked using the binary thresholded image, optionally marks used pixels in the debug image
       float estimate_distance_from_depthmap(const cv::Point2f& area_center, const float area_radius, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img);
       //}

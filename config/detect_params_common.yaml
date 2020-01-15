@@ -1,7 +1,4 @@
 ############### Distance estimation parameters ###############
-colors: [
-  "Red"
-  ]
 # distance estimation from object size parameters
 max_dist: 30.0
 max_dist_diff: 4.0
@@ -9,6 +6,7 @@ max_dist_diff: 4.0
 min_depth: 200 # millimetres
 max_depth: 12000 # millimetres
 distance_min_valid_pixels_ratio: 0.05
+ball_physical_diameter: 0.11
 
  ############### Other parameters ###############
 # xy_covariance_coeff: 0.001
@@ -28,7 +26,7 @@ cov_coeffs:
     both:        0.01
 
 ############### Default parameters for the dynamic reconfigure ################
-blob_radius_method: 1
+blob_radius_method: 0 # 0 for maximal method, 1 for median method
 filter_by_area: true
 filter_by_circularity: true
 filter_by_convexity: true

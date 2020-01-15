@@ -65,11 +65,11 @@ namespace object_detect
       /* get ball candidates //{ */
       std::vector<BallCandidate> balls;
       {
-        std::scoped_lock<std::mutex> lck(m_active_ball_types_mtx);
-        for (const auto& ball_type : m_active_ball_types)
-          NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)", color_name(ball_type->seg_conf->color_id).c_str(), binarization_method_name(ball_type->seg_conf->method).c_str());
+        NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)",
+            color_name(color_id_t(m_drmgr_ptr->config.segment_color)).c_str(),
+            binarization_method_name(bin_method_t(m_drmgr_ptr->config.binarization_method)).c_str());
         m_blob_det.set_drcfg(m_drmgr_ptr->config);
-        balls = m_blob_det.detect_lut(rgb_img, m_active_ball_types, label_img);
+        balls = m_blob_det.detect_candidates(rgb_img, label_img);
       }
       if (publish_debug)
         highlight_mask(dbg_img, label_img);
@@ -83,11 +83,10 @@ namespace object_detect
         cout << "[" << m_node_name << "]: Processing object " << it + 1 << "/" << balls.size() << " --------------------------" << std::endl;
 
         BallCandidate& ball = balls.at(it);
-        const bool valid_ball = !ball.type->unknown();
         const cv::Point& center = ball.location;
         const float radius = ball.radius;
-        const bool physical_radius_known = valid_ball && !std::isnan(ball.type->physical_radius);
-        std::string name_upper = ball.type->seg_conf->color_name;
+        const bool physical_radius_known = m_drmgr_ptr->config.ball_physical_diameter > 0.0;
+        std::string name_upper = color_name(color_id_t(ball.type));
         std::transform(name_upper.begin(), name_upper.end(), name_upper.begin(), ::toupper);
         cout << "object classified as " << name_upper << " ball" << std::endl;
 
@@ -101,7 +100,7 @@ namespace object_detect
         bool estimated_distance_valid = false;
         if (physical_radius_known)
         {
-          estimated_distance = estimate_distance_from_known_size(l_vec, r_vec, ball.type->physical_radius);
+          estimated_distance = estimate_distance_from_known_diameter(l_vec, r_vec, m_drmgr_ptr->config.ball_physical_diameter);
           cout << "Estimated distance: " << estimated_distance << endl;
           estimated_distance_valid = distance_valid(estimated_distance);
         }
@@ -205,7 +204,7 @@ namespace object_detect
           *iter_x = ball.position.x();
           *iter_y = ball.position.y();
           *iter_z = ball.position.z();
-          *iter_type = ball.type->seg_conf->color_id;
+          *iter_type = ball.type;
           *iter_dist_qual = ball.dist_qual;
         }
 
@@ -273,7 +272,7 @@ namespace object_detect
       pose_with_cov.pose = pose;
       pose_with_cov.covariance = cov;
       det.pose = pose_with_cov;
-      det.type = ball.type->seg_conf->color_id;
+      det.type = ball.type;
       ret.detections.push_back(det);
     }
     ret.header = header;
@@ -353,12 +352,12 @@ namespace object_detect
   }
   //}
 
-  /* estimate_distance_from_known_size() method //{ */
-  float ObjectDetector::estimate_distance_from_known_size(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float physical_radius)
+  /* estimate_distance_from_known_diameter() method //{ */
+  float ObjectDetector::estimate_distance_from_known_diameter(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float physical_diameter)
   {
     const Eigen::Vector3f c_vec = (l_vec + r_vec) / 2.0f;
     const float dot = c_vec.dot(l_vec)/(c_vec.norm() * l_vec.norm());
-    const float dist = physical_radius/std::sqrt(1.0f - dot*dot);
+    const float dist = physical_diameter/std::sqrt(1.0f - dot*dot)/2.0f;
     return dist;
   }
   //}
@@ -456,63 +455,6 @@ namespace object_detect
   }
   //}
 
-  /* load_ball_type() method //{ */
-  BallTypePtr ObjectDetector::load_ball_type(mrs_lib::ParamLoader& pl, const std::string& cfg_name)
-  {
-    BallTypePtr ret = std::make_shared<BallType>();
-    SegConfPtr seg_conf = std::make_shared<SegConf>();
-  
-    seg_conf->active = true;
-    seg_conf->color_id = color_id(cfg_name);
-    seg_conf->color_name = cfg_name;
-    std::transform(seg_conf->color_name.begin(), seg_conf->color_name.end(), seg_conf->color_name.begin(), ::tolower);
-  
-    const std::string bin_method = pl.load_param2<std::string>(seg_conf->color_name  + "/binarization_method");
-    seg_conf->method = binarization_method_id(bin_method);
-  
-    // Load HSV thresholding params
-    pl.load_param(seg_conf->color_name + "/hsv/hue_center", seg_conf->hue_center);
-    pl.load_param(seg_conf->color_name + "/hsv/hue_range", seg_conf->hue_range);
-    pl.load_param(seg_conf->color_name + "/hsv/sat_center", seg_conf->sat_center);
-    pl.load_param(seg_conf->color_name + "/hsv/sat_range", seg_conf->sat_range);
-    pl.load_param(seg_conf->color_name + "/hsv/val_center", seg_conf->val_center);
-    pl.load_param(seg_conf->color_name + "/hsv/val_range", seg_conf->val_range);
-  
-    // Load L*a*b* thresholding params
-    pl.load_param(seg_conf->color_name + "/lab/l_center", seg_conf->l_center);
-    pl.load_param(seg_conf->color_name + "/lab/l_range", seg_conf->l_range);
-    pl.load_param(seg_conf->color_name + "/lab/a_center", seg_conf->a_center);
-    pl.load_param(seg_conf->color_name + "/lab/a_range", seg_conf->a_range);
-    pl.load_param(seg_conf->color_name + "/lab/b_center", seg_conf->b_center);
-    pl.load_param(seg_conf->color_name + "/lab/b_range", seg_conf->b_range);
-  
-    ret->seg_conf = seg_conf;
-
-    pl.load_param(seg_conf->color_name + "/physical_radius", ret->physical_radius);
-
-    return ret;
-  }
-  //}
-
-  /* load_ball_types() method //{ */
-  std::vector<BallTypePtr> ObjectDetector::load_ball_types(mrs_lib::ParamLoader& pl, const std::vector<std::string>& color_strs)
-  {
-    std::vector<BallTypePtr> ball_types;
-    for (std::string color_name : color_strs)
-    {
-      // remove whitespaces
-      color_name.erase(std::remove_if(color_name.begin(), color_name.end(), ::isspace), color_name.end());
-      // skip empty ball_names (such as the last one)
-      if (!color_name.empty())
-      {
-        BallTypePtr ball_type = load_ball_type(pl, color_name);
-        ball_types.push_back(ball_type);
-      }
-    }
-    return ball_types;
-  }
-  //}
-
   /* onInit() method //{ */
 
   void ObjectDetector::onInit()
@@ -551,56 +493,9 @@ namespace object_detect
     m_cov_coeffs.insert({dist_qual_t::depthmap, cov_coeffs_depthmap});
     m_cov_coeffs.insert({dist_qual_t::both, cov_coeffs_both});
     
-    /* { */
-    /*   std::map<std::string, double> cov_coeffs_xy = pl.load_param2<std::map<std::string, double>>("cov_coeffs/xy"); */
-    /*   std::map<std::string, double> cov_coeffs_z = pl.load_param2<std::map<std::string, double>>("cov_coeffs/z"); */
-    /*   std::map<dist_qual_t, double> loaded_vals_xy; */
-    /*   for (const auto& keyval : cov_coeffs_xy) */
-    /*   { */
-    /*     int val; */
-    /*     if ((val = dist_qual_id(keyval.first)) == dist_qual_t::unknown_qual) */
-    /*     { */
-    /*       ROS_ERROR("[%s]: Unknwown distance estimation quality key: '%s'! Skipping.", m_node_name.c_str(), keyval.first.c_str()); */
-    /*       continue; */
-    /*     } */
-    /*     dist_qual_t enval = (dist_qual_t)val; */
-    /*     loaded_vals_xy.insert({enval, keyval.second}); */
-    /*   } */
-    /*   std::map<dist_qual_t, double> loaded_vals_z; */
-    /*   for (const auto& keyval : cov_coeffs_z) */
-    /*   { */
-    /*     int val; */
-    /*     if ((val = dist_qual_id(keyval.first)) == dist_qual_t::unknown_qual) */
-    /*     { */
-    /*       ROS_ERROR("[%s]: Unknwown distance estimation quality key: '%s'! Skipping.", m_node_name.c_str(), keyval.first.c_str()); */
-    /*       continue; */
-    /*     } */
-    /*     dist_qual_t enval = (dist_qual_t)val; */
-    /*     loaded_vals_z.insert({enval, keyval.second}); */
-    /*   } */
-    /*   for (const auto& keyval : loaded_vals_xy) */
-    /*   { */
-    /*     auto it = std::end(loaded_vals_z); */
-    /*     if ((it = loaded_vals_z.find(keyval.first)) == std::end(loaded_vals_z)) */
-    /*     { */
-    /*       ROS_ERROR("[%s]: Distance estimation quality key '%s' was specified for xy but not for z! Skipping.", m_node_name.c_str(), dist_qual_name(keyval.first).c_str()); */
-    /*       continue; */
-    /*     } */
-    /*     m_cov_coeffs.insert({keyval.first, {keyval.second, it->second}}); */
-    /*     ROS_INFO("[%s]: Inserting xyz coeffs: [%.2f, %.2f, %.2f].", m_node_name.c_str(), keyval.second, keyval.second, it->second); */
-    /*   } */
-    /*   for (const auto& keyval : loaded_vals_z) */
-    /*     if (loaded_vals_xy.find(keyval.first) == std::end(loaded_vals_xy)) */
-    /*       ROS_ERROR("[%s]: Distance estimation quality key '%s' was specified for xy but not for z! Skipping.", m_node_name.c_str(), dist_qual_name(keyval.first).c_str()); */
-    /*       // just warn the user, not much else we can do */
-    /* } */
-    
     //}
 
     double loop_rate = pl.load_param2<double>("loop_rate", 100);
-    const std::vector<std::string> color_strs = pl.load_param2<std::vector<std::string>>("colors");
-    m_ball_types = load_ball_types(pl, color_strs);
-    m_active_ball_types = m_ball_types;
 
     if (!m_drmgr_ptr->loaded_successfully())
     {
@@ -628,9 +523,6 @@ namespace object_detect
     m_pub_debug = it.advertise("debug_image", 1);
     m_pub_pcl = nh.advertise<sensor_msgs::PointCloud2>("detected_balls_pcl", 10);
     m_pub_det = nh.advertise<object_detect::BallDetections>("detected_balls", 10);
-
-    m_ball_change_server = nh.advertiseService("change_balls", &ObjectDetector::ball_change_callback, this);
-    m_ball_query_server = nh.advertiseService("query_balls", &ObjectDetector::ball_query_callback, this);
     //}
 
     /* profiler //{ */
@@ -641,13 +533,9 @@ namespace object_detect
 
     m_prev_color_id = m_drmgr_ptr->config.segment_color;
     {
-      std::vector<SegConfPtr> seg_confs;
-      seg_confs.reserve(m_ball_types.size());
-      for (const auto& ball_type : m_ball_types)
-        seg_confs.push_back(ball_type->seg_conf);
       const auto lut_start_time = ros::WallTime::now();
       ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
-      const auto lut = generate_lut(seg_confs);
+      const auto lut = generate_lut(m_drmgr_ptr->config);
       const auto lut_end_time = ros::WallTime::now();
       const auto lut_dur = lut_end_time - lut_start_time;
       ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
@@ -673,85 +561,6 @@ namespace object_detect
     ROS_INFO("[%s]: Initialized ------------------------------", m_node_name.c_str());
   }
 
-  //}
-
-  /* ObjectDetector::ball_change_callback() method //{ */
-  
-  bool ObjectDetector::ball_change_callback(object_detect::BallChange::Request& req, object_detect::BallChange::Response& resp)
-  {
-    std::vector<std::string> known_ballnames;
-    std::vector<BallTypePtr> ball_types;
-    std::vector<std::string> unknown_ballnames;
-    for (const auto& ball_name : req.detect_balls)
-    {
-      std::string lowercase = ball_name;
-      std::transform(lowercase.begin(), lowercase.end(), lowercase.begin(), ::tolower);
-      std::vector<BallTypePtr> cur_ball_types;
-      for (const auto& ball_type : m_ball_types)
-      {
-        if (ball_type->seg_conf->color_name == lowercase)
-          cur_ball_types.push_back(ball_type);
-      }
-      if (cur_ball_types.empty())
-      {
-        unknown_ballnames.push_back(lowercase);
-      } else
-      {
-        known_ballnames.push_back(lowercase);
-        ball_types.insert(std::end(ball_types), std::begin(cur_ball_types), std::end(cur_ball_types));
-      }
-    }
-  
-    if (unknown_ballnames.empty())
-    {
-      {
-        std::scoped_lock<std::mutex> lck(m_active_ball_types_mtx);
-        m_active_ball_types = ball_types;
-      }
-      std::stringstream ss;
-      ss << "Detecting balls: [";
-      for (size_t it = 0; it < known_ballnames.size(); it++)
-      {
-        ss << known_ballnames.at(it);
-        if (it < known_ballnames.size()-1)
-          ss << ", ";
-      }
-      ss << "]";
-      resp.message = ss.str();
-      resp.success = true;
-      NODELET_INFO("[%s]: %s", m_node_name.c_str(), resp.message.c_str());
-    } else
-    {
-      std::stringstream ss;
-      ss << "Unknown balls: [";
-      for (size_t it = 0; it < unknown_ballnames.size(); it++)
-      {
-        ss << unknown_ballnames.at(it);
-        if (it < unknown_ballnames.size()-1)
-          ss << ", ";
-      }
-      ss << "]";
-      resp.message = ss.str();
-      resp.success = false;
-      NODELET_WARN("[%s]: %s", m_node_name.c_str(), resp.message.c_str());
-    }
-    return true;
-  }
-  
-  //}
-
-  /* ObjectDetector::ball_query_callback() method //{ */
-  
-  bool ObjectDetector::ball_query_callback([[maybe_unused]] object_detect::BallQuery::Request& req, object_detect::BallQuery::Response& resp)
-  {
-    resp.ball_types.reserve(m_ball_types.size());
-    for (const auto& ball_type : m_ball_types)
-    {
-      resp.ball_types.push_back(ball_type->seg_conf->color_name);
-    }
-    return true;
-  }
-  
   //}
 
 }
