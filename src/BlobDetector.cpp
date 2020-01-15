@@ -324,7 +324,7 @@ cv::Mat BlobDetector::segment_lut(cv::Mat in_img, cv::OutputArray p_labels_img)
   if (!ocl_success)
     segment_image_lut_cpu(in_img, m_lut, labels, bin_imgs, p_labels_img);
 
-  cv::Mat binary_img = bin_imgs(in_img).reshape(0, in_img.rows);
+  cv::Mat binary_img = bin_imgs.reshape(0, in_img.rows);
   return binary_img;
 }
 //}
