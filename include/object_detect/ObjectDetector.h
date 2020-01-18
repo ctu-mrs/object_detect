@@ -132,7 +132,7 @@ namespace object_detect
 
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
-      object_detect::BallDetections to_output_message(const std::vector<BallCandidate>& balls, const std_msgs::Header& header) const;
+      object_detect::BallDetections to_output_message(const std::vector<BallCandidate>& balls, const std_msgs::Header& header, const sensor_msgs::CameraInfo& cinfo) const;
       static ros_cov_t generate_covariance(const Eigen::Vector3f& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);

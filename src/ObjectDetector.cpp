@@ -170,12 +170,12 @@ namespace object_detect
       /* Publish all the calculated valid positions //{ */
       if (m_pub_det.getNumSubscribers() > 0)
       {
-        const object_detect::BallDetections det_msg = to_output_message(balls, rgb_img_msg->header);
+        const object_detect::BallDetections det_msg = to_output_message(balls, rgb_img_msg->header, m_rgb_camera_model.cameraInfo());
         m_pub_det.publish(det_msg);
       }
       //}
 
-      /* Publish all the calculated valid positions //{ */
+      /* Publish all the calculated valid positions as pointcloud (for debugging) //{ */
       if (m_pub_pcl.getNumSubscribers() > 0)
       {
         sensor_msgs::PointCloud2 pcl_msg;
@@ -240,10 +240,12 @@ namespace object_detect
   //}
 
   /* to_output_message() method //{ */
-  object_detect::BallDetections ObjectDetector::to_output_message(const std::vector<BallCandidate>& balls, const std_msgs::Header& header) const
+  object_detect::BallDetections ObjectDetector::to_output_message(const std::vector<BallCandidate>& balls, const std_msgs::Header& header, const sensor_msgs::CameraInfo& cinfo) const
   {
     object_detect::BallDetections ret;
     ret.detections.reserve(balls.size());
+    ret.header = header;
+    ret.camera_info = cinfo;
   
     for (const auto& ball : balls)
     {
@@ -275,7 +277,6 @@ namespace object_detect
       det.type = ball.type;
       ret.detections.push_back(det);
     }
-    ret.header = header;
     return ret;
   }
   //}
