@@ -386,8 +386,8 @@ void BlobDetector::postprocess_binary_image(cv::Mat binary_img) const
 /* BlobDetector::threshold_hsv() method //{ */
 cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img) const
 {
-  double hue_lower = m_drcfg.hsv__hue_center - m_drcfg.hsv__hue_range / 2.0;
-  double hue_higher = m_drcfg.hsv__hue_center + m_drcfg.hsv__hue_range / 2.0;
+  double hue_lower = m_drcfg.ball__hsv__hue_center - m_drcfg.ball__hsv__hue_range / 2.0;
+  double hue_higher = m_drcfg.ball__hsv__hue_center + m_drcfg.ball__hsv__hue_range / 2.0;
   bool overflow;
   /* calculate the correct bounds for the pixel HSV values //{ */
   {
@@ -405,11 +405,11 @@ cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img) const
   }
   //}
 
-  double sat_lower = m_drcfg.hsv__sat_center - m_drcfg.hsv__sat_range / 2.0;
-  double sat_higher = m_drcfg.hsv__sat_center + m_drcfg.hsv__sat_range / 2.0;
+  double sat_lower = m_drcfg.ball__hsv__sat_center - m_drcfg.ball__hsv__sat_range / 2.0;
+  double sat_higher = m_drcfg.ball__hsv__sat_center + m_drcfg.ball__hsv__sat_range / 2.0;
 
-  double val_lower = m_drcfg.hsv__val_center - m_drcfg.hsv__val_range / 2.0;
-  double val_higher = m_drcfg.hsv__val_center + m_drcfg.hsv__val_range / 2.0;
+  double val_lower = m_drcfg.ball__hsv__val_center - m_drcfg.ball__hsv__val_range / 2.0;
+  double val_higher = m_drcfg.ball__hsv__val_center + m_drcfg.ball__hsv__val_range / 2.0;
 
   cv::Mat binary_img;
   // filter the HSV image by color
@@ -452,14 +452,14 @@ cv::Mat BlobDetector::threshold_hsv(cv::Mat hsv_img) const
 /* BlobDetector::threshold_lab() method //{ */
 cv::Mat BlobDetector::threshold_lab(cv::Mat lab_img) const
 {
-  double l_lower = m_drcfg.lab__l_center - m_drcfg.lab__l_range / 2.0;
-  double l_higher = m_drcfg.lab__l_center + m_drcfg.lab__l_range / 2.0;
+  double l_lower = m_drcfg.ball__lab__l_center - m_drcfg.ball__lab__l_range / 2.0;
+  double l_higher = m_drcfg.ball__lab__l_center + m_drcfg.ball__lab__l_range / 2.0;
 
-  double a_lower = m_drcfg.lab__a_center - m_drcfg.lab__a_range / 2.0;
-  double a_higher = m_drcfg.lab__a_center + m_drcfg.lab__a_range / 2.0;
+  double a_lower = m_drcfg.ball__lab__a_center - m_drcfg.ball__lab__a_range / 2.0;
+  double a_higher = m_drcfg.ball__lab__a_center + m_drcfg.ball__lab__a_range / 2.0;
 
-  double b_lower = m_drcfg.lab__b_center - m_drcfg.lab__b_range / 2.0;
-  double b_higher = m_drcfg.lab__b_center + m_drcfg.lab__b_range / 2.0;
+  double b_lower = m_drcfg.ball__lab__b_center - m_drcfg.ball__lab__b_range / 2.0;
+  double b_higher = m_drcfg.ball__lab__b_center + m_drcfg.ball__lab__b_range / 2.0;
 
   cv::Mat binary_img;
   // filter the Lab image by color

@@ -84,23 +84,23 @@ namespace object_detect
 
         BallCandidate& ball = balls.at(it);
         const cv::Point& center = ball.location;
-        const float radius = ball.radius;
-        const bool physical_radius_known = m_drmgr_ptr->config.ball_physical_diameter > 0.0;
+        const float px_radius = ball.radius;
+        const bool physical_dimension_known = m_drmgr_ptr->config.ball__physical_diameter > 0.0;
         std::string name_upper = color_name(color_id_t(ball.type));
         std::transform(name_upper.begin(), name_upper.end(), name_upper.begin(), ::toupper);
         cout << "object classified as " << name_upper << " ball" << std::endl;
 
         /* Calculate 3D vector pointing to left and right edges of the detected object //{ */
-        const Eigen::Vector3f l_vec = project(center.x - radius*cos(M_PI_4), center.y - radius*sin(M_PI_4), m_rgb_camera_model);
-        const Eigen::Vector3f r_vec = project(center.x + radius*cos(M_PI_4), center.y + radius*sin(M_PI_4), m_rgb_camera_model);
+        const Eigen::Vector3f l_vec = project(center.x - px_radius*cos(M_PI_4), center.y - px_radius*sin(M_PI_4), m_rgb_camera_model);
+        const Eigen::Vector3f r_vec = project(center.x + px_radius*cos(M_PI_4), center.y + px_radius*sin(M_PI_4), m_rgb_camera_model);
         //}
         
         /* Estimate distance based on known size of object if applicable //{ */
         float estimated_distance = 0.0f;
         bool estimated_distance_valid = false;
-        if (physical_radius_known)
+        if (physical_dimension_known)
         {
-          estimated_distance = estimate_distance_from_known_diameter(l_vec, r_vec, m_drmgr_ptr->config.ball_physical_diameter);
+          estimated_distance = estimate_distance_from_known_diameter(l_vec, r_vec, m_drmgr_ptr->config.ball__physical_diameter);
           cout << "Estimated distance: " << estimated_distance << endl;
           estimated_distance_valid = distance_valid(estimated_distance);
         }
@@ -111,7 +111,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, radius, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(center, px_radius, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           cout << "Depthmap distance: " << depthmap_distance << endl;
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -141,13 +141,13 @@ namespace object_detect
         if (publish_debug)
         {
           /* cv::circle(dbg_img, center, radius, color_highlight(2*blob.color), 2); */
-          cv::circle(dbg_img, center, radius, cv::Scalar(0, 0, 255), 2);
-          cv::putText(dbg_img, std::to_string(resulting_distance_quality), center+cv::Point(radius, radius), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", center+cv::Point(radius, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", center+cv::Point(radius, -radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::circle(dbg_img, center, px_radius, cv::Scalar(0, 0, 255), 2);
+          cv::putText(dbg_img, std::to_string(resulting_distance_quality), center+cv::Point(px_radius, px_radius), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", center+cv::Point(px_radius, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", center+cv::Point(px_radius, -px_radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
         }
 
-        cout << "Estimated distance used: " << m_object_radius_known
+        cout << "Estimated distance used: " << physical_dimension_known
              << ", valid: " << estimated_distance_valid
              << ", depthmap distance valid: " << depthmap_distance_valid
              << ", resulting quality: " << resulting_distance_quality << std::endl;
@@ -496,8 +496,8 @@ namespace object_detect
     
     //}
 
-    const std::string bin_method_str = pl.load_param2<std::string>("binarization_method_name");
-    const std::string segment_color = pl.load_param2<std::string>("segment_color_name");
+    const std::string bin_method_str = pl.load_param2<std::string>("ball/binarization_method_name");
+    const std::string segment_color = pl.load_param2<std::string>("ball/segment_color_name");
     m_drmgr_ptr->config.binarization_method = binarization_method_id(bin_method_str);
     m_drmgr_ptr->config.segment_color = color_id(segment_color);
     m_drmgr_ptr->config.override_settings = false;

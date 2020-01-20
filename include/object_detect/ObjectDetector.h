@@ -145,8 +145,6 @@ namespace object_detect
 
       /* Parameters, loaded from ROS //{ */
       std::string m_world_frame;
-      bool m_object_radius_known;
-      double m_object_radius;
       double m_max_dist;
       double m_max_dist_diff;
       double m_min_depth;

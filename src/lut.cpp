@@ -63,8 +63,8 @@ namespace object_detect
 
   void add_lut_hsv(lut_t& ret, const drcfg_t& drcfg)
   {
-    double hue_lower = drcfg.hsv__hue_center - drcfg.hsv__hue_range / 2.0;
-    double hue_higher = drcfg.hsv__hue_center + drcfg.hsv__hue_range / 2.0;
+    double hue_lower = drcfg.ball__hsv__hue_center - drcfg.ball__hsv__hue_range / 2.0;
+    double hue_higher = drcfg.ball__hsv__hue_center + drcfg.ball__hsv__hue_range / 2.0;
     bool overflow;
     static cv::Mat rgb2hsv_lut;
     if (rgb2hsv_lut.empty())
@@ -98,11 +98,11 @@ namespace object_detect
     }
     //}
 
-    const double sat_lower = drcfg.hsv__sat_center - drcfg.hsv__sat_range / 2.0;
-    const double sat_higher = drcfg.hsv__sat_center + drcfg.hsv__sat_range / 2.0;
+    const double sat_lower = drcfg.ball__hsv__sat_center - drcfg.ball__hsv__sat_range / 2.0;
+    const double sat_higher = drcfg.ball__hsv__sat_center + drcfg.ball__hsv__sat_range / 2.0;
 
-    const double val_lower = drcfg.hsv__val_center - drcfg.hsv__val_range / 2.0;
-    const double val_higher = drcfg.hsv__val_center + drcfg.hsv__val_range / 2.0;
+    const double val_lower = drcfg.ball__hsv__val_center - drcfg.ball__hsv__val_range / 2.0;
+    const double val_higher = drcfg.ball__hsv__val_center + drcfg.ball__hsv__val_range / 2.0;
 
     parallel_for_(cv::Range(0, lut_dim), parallelHSVLUT(
           rgb2hsv_lut,
@@ -191,14 +191,14 @@ namespace object_detect
       cv::cvtColor(rgb2lab_lut, rgb2lab_lut, cv::COLOR_RGB2Lab);
     }
 
-    const double l_lower = drcfg.lab__l_center - drcfg.lab__l_range / 2.0;
-    const double l_higher = drcfg.lab__l_center + drcfg.lab__l_range / 2.0;
+    const double l_lower = drcfg.ball__lab__l_center - drcfg.ball__lab__l_range / 2.0;
+    const double l_higher = drcfg.ball__lab__l_center + drcfg.ball__lab__l_range / 2.0;
 
-    const double a_lower = drcfg.lab__a_center - drcfg.lab__a_range / 2.0;
-    const double a_higher = drcfg.lab__a_center + drcfg.lab__a_range / 2.0;
+    const double a_lower = drcfg.ball__lab__a_center - drcfg.ball__lab__a_range / 2.0;
+    const double a_higher = drcfg.ball__lab__a_center + drcfg.ball__lab__a_range / 2.0;
 
-    const double b_lower = drcfg.lab__b_center - drcfg.lab__b_range / 2.0;
-    const double b_higher = drcfg.lab__b_center + drcfg.lab__b_range / 2.0;
+    const double b_lower = drcfg.ball__lab__b_center - drcfg.ball__lab__b_range / 2.0;
+    const double b_higher = drcfg.ball__lab__b_center + drcfg.ball__lab__b_range / 2.0;
 
     parallel_for_(cv::Range(0, lut_dim), parallelLabLUT(
           rgb2lab_lut,
