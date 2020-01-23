@@ -140,6 +140,7 @@ namespace object_detect
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);
       void highlight_mask(cv::Mat& img, cv::Mat label_img);
+      void load_ball_to_dynrec(mrs_lib::ParamLoader& pl);
 
     private:
       // --------------------------------------------------------------
@@ -157,6 +158,8 @@ namespace object_detect
       //}
 
       /* ROS related variables (subscribers, timers etc.) //{ */
+      ros::NodeHandle m_nh;
+
       std::unique_ptr<drmgr_t> m_drmgr_ptr;
 
       mrs_lib::SubscribeHandlerPtr<sensor_msgs::Image> m_sh_dm;

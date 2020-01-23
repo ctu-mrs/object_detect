@@ -63,9 +63,9 @@ namespace object_detect
       //}
 
       /* get ball candidates //{ */
-      NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)",
+      NODELET_INFO_THROTTLE(0.5, "[ObjectDetector]: Segmenting %s color (by %s) %d",
           color_name(color_id_t(m_drmgr_ptr->config.segment_color)).c_str(),
-          binarization_method_name(bin_method_t(m_drmgr_ptr->config.binarization_method)).c_str());
+          binarization_method_name(bin_method_t(m_drmgr_ptr->config.binarization_method)).c_str(), m_drmgr_ptr->config.segment_color);
       std::vector<BallCandidate> balls;
       {
         std::scoped_lock lck(m_blob_det_mtx);
@@ -81,7 +81,7 @@ namespace object_detect
 
       for (size_t it = 0; it < balls.size(); it++)
       {
-        cout << "[" << m_node_name << "]: Processing object " << it + 1 << "/" << balls.size() << " --------------------------" << std::endl;
+        /* cout << "[" << m_node_name << "]: Processing object " << it + 1 << "/" << balls.size() << " --------------------------" << std::endl; */
 
         BallCandidate& ball = balls.at(it);
         const cv::Point& center = ball.location;
@@ -89,7 +89,7 @@ namespace object_detect
         const bool physical_dimension_known = m_drmgr_ptr->config.ball__physical_diameter > 0.0;
         std::string name_upper = color_name(color_id_t(ball.type));
         std::transform(name_upper.begin(), name_upper.end(), name_upper.begin(), ::toupper);
-        cout << "object classified as " << name_upper << " ball" << std::endl;
+        /* cout << "object classified as " << name_upper << " ball" << std::endl; */
 
         /* Calculate 3D vector pointing to left and right edges of the detected object //{ */
         const Eigen::Vector3f l_vec = project(center.x - px_radius*cos(M_PI_4), center.y - px_radius*sin(M_PI_4), m_rgb_camera_model);
@@ -102,7 +102,7 @@ namespace object_detect
         if (physical_dimension_known)
         {
           estimated_distance = estimate_distance_from_known_diameter(l_vec, r_vec, m_drmgr_ptr->config.ball__physical_diameter);
-          cout << "Estimated distance: " << estimated_distance << endl;
+          /* cout << "Estimated distance: " << estimated_distance << endl; */
           estimated_distance_valid = distance_valid(estimated_distance);
         }
         //}
@@ -113,7 +113,7 @@ namespace object_detect
         if (dm_ready)
         {
           depthmap_distance = estimate_distance_from_depthmap(center, px_radius, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
-          cout << "Depthmap distance: " << depthmap_distance << endl;
+          /* cout << "Depthmap distance: " << depthmap_distance << endl; */
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
         //}
@@ -148,23 +148,23 @@ namespace object_detect
           cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", center+cv::Point(px_radius, -px_radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
         }
 
-        cout << "Estimated distance used: " << physical_dimension_known
-             << ", valid: " << estimated_distance_valid
-             << ", depthmap distance valid: " << depthmap_distance_valid
-             << ", resulting quality: " << resulting_distance_quality << std::endl;
+        /* cout << "Estimated distance used: " << physical_dimension_known */
+        /*      << ", valid: " << estimated_distance_valid */
+        /*      << ", depthmap distance valid: " << depthmap_distance_valid */
+        /*      << ", resulting quality: " << resulting_distance_quality << std::endl; */
 
         if (resulting_distance_quality > dist_qual_t::no_estimate)
         {
           /* Calculate the estimated position of the object //{ */
           const Eigen::Vector3f pos_vec = resulting_distance * ((l_vec + r_vec) / 2.0).normalized();
-          cout << "Estimated location (camera CS): [" << pos_vec(0) << ", " << pos_vec(1) << ", " << pos_vec(2) << "]" << std::endl;
+          /* cout << "Estimated location (camera CS): [" << pos_vec(0) << ", " << pos_vec(1) << ", " << pos_vec(2) << "]" << std::endl; */
           ball.position = pos_vec;
           /* cout << "Estimated location (camera CS): [" << ball.position(0) << ", " << ball.position(1) << ", " << ball.position(2) << "]" << std::endl; */
           //}
         }
         ball.dist_qual = resulting_distance_quality;
 
-        cout << "[" << m_node_name << "]: Done with object " << it + 1 << "/" << balls.size() << " --------------------------" << std::endl;
+        /* cout << "[" << m_node_name << "]: Done with object " << it + 1 << "/" << balls.size() << " --------------------------" << std::endl; */
       }
       //}
 
@@ -230,11 +230,11 @@ namespace object_detect
       static double fps = 1.0 / dur.toSec();
       if (dur.toSec() > 0.0)
         fps = 0.1*(1.0 / dur.toSec()) + 0.9*fps;
-      cout << "processing FPS: " << fps << "Hz" << std::endl;
-      cout << "delay: " << del.toSec() * 1000.0 << "ms (processing: " << dur.toSec() * 1000.0 << "ms)" << std::endl;
+      ROS_INFO_STREAM_THROTTLE(1.0, "Processing FPS: " << fps << "Hz");
+      ROS_INFO_STREAM_THROTTLE(1.0, "delay: " << del.toSec() * 1000.0 << "ms (processing: " << dur.toSec() * 1000.0 << "ms)");
       //}
 
-      ROS_INFO("[%s]: Image processed", m_node_name.c_str());
+      ROS_INFO_THROTTLE(0.5, "[%s]: Image processed", m_node_name.c_str());
     }
     
   }
@@ -463,15 +463,15 @@ namespace object_detect
   {
 
     ROS_INFO("[%s]: Initializing ------------------------------", m_node_name.c_str());
-    ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
+    m_nh = nodelet::Nodelet::getMTPrivateNodeHandle();
     ros::Time::waitForValid();
 
     /** Load parameters from ROS * //{*/
     string node_name = ros::this_node::getName().c_str();
-    ParamLoader pl(nh, m_node_name);
+    ParamLoader pl(m_nh, m_node_name);
 
     // LOAD DYNAMIC PARAMETERS
-    m_drmgr_ptr = std::make_unique<drmgr_t>(nh, m_node_name);
+    m_drmgr_ptr = std::make_unique<drmgr_t>(m_nh, m_node_name);
 
     // LOAD STATIC PARAMETERS
     ROS_INFO("[%s]: Loading static parameters:", m_node_name.c_str());
@@ -521,21 +521,21 @@ namespace object_detect
     
     /** Create publishers and subscribers //{**/
     // Initialize other subs and pubs
-    SubscribeMgr smgr(nh);
+    SubscribeMgr smgr(m_nh);
     m_sh_dm = smgr.create_handler<sensor_msgs::Image>("dm_image", ros::Duration(5.0));
     m_sh_dm_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("dm_camera_info", ros::Duration(5.0));
     m_sh_rgb = smgr.create_handler<sensor_msgs::Image>("rgb_image", ros::Duration(5.0));
     m_sh_rgb_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("rgb_camera_info", ros::Duration(5.0));
   
-    image_transport::ImageTransport it(nh);
+    image_transport::ImageTransport it(m_nh);
     m_pub_debug = it.advertise("debug_image", 1);
-    m_pub_pcl = nh.advertise<sensor_msgs::PointCloud2>("detected_balls_pcl", 10);
-    m_pub_det = nh.advertise<object_detect::BallDetections>("detected_balls", 10);
+    m_pub_pcl = m_nh.advertise<sensor_msgs::PointCloud2>("detected_balls_pcl", 10);
+    m_pub_det = m_nh.advertise<object_detect::BallDetections>("detected_balls", 10);
     //}
 
     /* profiler //{ */
 
-    m_profiler_ptr = std::make_unique<mrs_lib::Profiler>(nh, m_node_name, false);
+    m_profiler_ptr = std::make_unique<mrs_lib::Profiler>(m_nh, m_node_name, false);
 
     //}
 
@@ -553,13 +553,13 @@ namespace object_detect
       }
     }
 
-    m_srv_regenerate_lut = nh.advertiseService("regenerate_lut", &ObjectDetector::cbk_regenerate_lut, this);
+    m_srv_regenerate_lut = m_nh.advertiseService("regenerate_lut", &ObjectDetector::cbk_regenerate_lut, this);
 
     m_is_initialized = true;
 
     /* timers  //{ */
 
-    m_main_loop_timer = nh.createTimer(ros::Rate(loop_rate), &ObjectDetector::main_loop, this);
+    m_main_loop_timer = m_nh.createTimer(ros::Rate(loop_rate), &ObjectDetector::main_loop, this);
 
     //}
 
@@ -583,10 +583,48 @@ namespace object_detect
 
   //}
 
+  void ObjectDetector::load_ball_to_dynrec(mrs_lib::ParamLoader& pl)
+  {
+    drcfg_t cfg = m_drmgr_ptr->config;
+
+    std::string bin_method_str = pl.load_param2<std::string>("ball/binarization_method_name");
+    std::string segment_color = pl.load_param2<std::string>("ball/segment_color_name");
+    cfg.binarization_method = binarization_method_id(bin_method_str);
+    cfg.segment_color = color_id(segment_color);
+    cfg.override_settings = false;
+    cfg.ball__physical_diameter = pl.load_param2<double>("ball/physical_diameter");
+
+    cfg.ball__lab__l_range = pl.load_param2<int>("ball/lab/l_range");
+    cfg.ball__lab__a_range = pl.load_param2<int>("ball/lab/a_range");
+    cfg.ball__lab__b_range = pl.load_param2<int>("ball/lab/b_range");
+    cfg.ball__lab__l_center = pl.load_param2<int>("ball/lab/l_center");
+    cfg.ball__lab__a_center = pl.load_param2<int>("ball/lab/a_center");
+    cfg.ball__lab__b_center = pl.load_param2<int>("ball/lab/b_center");
+
+    cfg.ball__hsv__hue_range = pl.load_param2<int>("ball/hsv/hue_range");
+    cfg.ball__hsv__sat_range = pl.load_param2<int>("ball/hsv/sat_range");
+    cfg.ball__hsv__val_range = pl.load_param2<int>("ball/hsv/val_range");
+    cfg.ball__hsv__hue_center = pl.load_param2<int>("ball/hsv/hue_center");
+    cfg.ball__hsv__sat_center = pl.load_param2<int>("ball/hsv/sat_center");
+    cfg.ball__hsv__val_center = pl.load_param2<int>("ball/hsv/val_center");
+
+    m_drmgr_ptr->config = cfg;
+    m_drmgr_ptr->update_config();
+  }
+
   /* ObjectDetector::cbk_regenerate_lut() method //{ */
 
   bool ObjectDetector::cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp)
   {
+    mrs_lib::ParamLoader pl(m_nh);
+    load_ball_to_dynrec(pl);
+    if (!pl.loaded_successfully() || !m_drmgr_ptr->loaded_successfully())
+    {
+      resp.message = "Could not load some compulsory parameters!";
+      resp.success = false;
+      return true;
+    }
+
     const auto lut = regenerate_lut();
     {
       std::scoped_lock lck(m_blob_det_mtx);
