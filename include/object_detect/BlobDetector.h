@@ -43,6 +43,7 @@ namespace object_detect
       BlobDetector(cv::InputArray lut);
       BlobDetector(const std::string& ocl_kernel_filename, cv::InputArray lut);
       void set_drcfg(const drcfg_t& drcfg);
+      void set_lut(cv::InputArray lut);
       std::vector<BallCandidate> detect_candidates(cv::Mat in_img, cv::OutputArray p_labels_img = cv::noArray());
 
     private:

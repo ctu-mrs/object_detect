@@ -63,11 +63,12 @@ namespace object_detect
       //}
 
       /* get ball candidates //{ */
+      NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)",
+          color_name(color_id_t(m_drmgr_ptr->config.segment_color)).c_str(),
+          binarization_method_name(bin_method_t(m_drmgr_ptr->config.binarization_method)).c_str());
       std::vector<BallCandidate> balls;
       {
-        NODELET_INFO("[ObjectDetector]: Segmenting %s color (by %s)",
-            color_name(color_id_t(m_drmgr_ptr->config.segment_color)).c_str(),
-            binarization_method_name(bin_method_t(m_drmgr_ptr->config.binarization_method)).c_str());
+        std::scoped_lock lck(m_blob_det_mtx);
         m_blob_det.set_drcfg(m_drmgr_ptr->config);
         balls = m_blob_det.detect_candidates(rgb_img, label_img);
       }
@@ -519,7 +520,6 @@ namespace object_detect
     //}
     
     /** Create publishers and subscribers //{**/
-    // Initialize transform listener
     // Initialize other subs and pubs
     SubscribeMgr smgr(nh);
     m_sh_dm = smgr.create_handler<sensor_msgs::Image>("dm_image", ros::Duration(5.0));
@@ -541,13 +541,8 @@ namespace object_detect
 
     m_prev_color_id = m_drmgr_ptr->config.segment_color;
     {
-      const auto lut_start_time = ros::WallTime::now();
-      ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
-      const auto lut = generate_lut(m_drmgr_ptr->config);
-      const auto lut_end_time = ros::WallTime::now();
-      const auto lut_dur = lut_end_time - lut_start_time;
-      ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
-
+      const auto lut = regenerate_lut();
+      std::scoped_lock lck(m_blob_det_mtx);
       if (use_ocl)
       {
         m_blob_det = BlobDetector(ocl_lut_kernel_file, lut);
@@ -558,6 +553,8 @@ namespace object_detect
       }
     }
 
+    m_srv_regenerate_lut = nh.advertiseService("regenerate_lut", &ObjectDetector::cbk_regenerate_lut, this);
+
     m_is_initialized = true;
 
     /* timers  //{ */
@@ -567,6 +564,37 @@ namespace object_detect
     //}
 
     ROS_INFO("[%s]: Initialized ------------------------------", m_node_name.c_str());
+  }
+
+  //}
+
+  /* ObjectDetector::regenerate_lut() method //{ */
+
+  object_detect::lut_t ObjectDetector::regenerate_lut()
+  {
+    const auto lut_start_time = ros::WallTime::now();
+    ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
+    const auto lut = generate_lut(m_drmgr_ptr->config);
+    const auto lut_end_time = ros::WallTime::now();
+    const auto lut_dur = lut_end_time - lut_start_time;
+    ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
+    return lut;
+  }
+
+  //}
+
+  /* ObjectDetector::cbk_regenerate_lut() method //{ */
+
+  bool ObjectDetector::cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp)
+  {
+    const auto lut = regenerate_lut();
+    {
+      std::scoped_lock lck(m_blob_det_mtx);
+      m_blob_det.set_lut(lut);
+    }
+    resp.message = "The LUT table was regenerated.";
+    resp.success = true;
+    return true;
   }
 
   //}

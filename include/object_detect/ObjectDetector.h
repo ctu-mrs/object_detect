@@ -26,6 +26,7 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2/LinearMath/Vector3.h>
 #include <dynamic_reconfigure/server.h>
+#include <std_srvs/Trigger.h>
 
 // Eigen includes
 #include <Eigen/Dense>
@@ -129,6 +130,8 @@ namespace object_detect
     public:
       ObjectDetector() : m_node_name("ObjectDetector") {};
       virtual void onInit();
+      bool cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp);
+      object_detect::lut_t regenerate_lut();
 
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
@@ -165,6 +168,8 @@ namespace object_detect
       ros::Publisher m_pub_pcl;
       image_transport::Publisher m_pub_debug;
 
+      ros::ServiceServer m_srv_regenerate_lut;
+
       ros::Timer m_main_loop_timer;
       //}
 
@@ -176,6 +181,7 @@ namespace object_detect
       /* Other variables //{ */
       const std::string m_node_name;
       bool m_is_initialized;
+      std::mutex m_blob_det_mtx;
       BlobDetector m_blob_det;
       int m_prev_color_id;
       std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;

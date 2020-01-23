@@ -54,16 +54,14 @@ BlobDetector::BlobDetector(cv::InputArray lut)
   :
     m_use_ocl(false)
 {
-  lut.copyTo(m_lut);
-  lut.copyTo(m_ulut);
+  set_lut(lut);
 }
 
 BlobDetector::BlobDetector(const std::string& ocl_kernel_filename, cv::InputArray lut)
   :
     m_use_ocl(true)
 {
-  lut.copyTo(m_lut);
-  lut.copyTo(m_ulut);
+  set_lut(lut);
 
   const std::string ocl_options = "";
   m_ocl_seg_kernel = load_ocl_kernel(ocl_kernel_filename, "segmentation", ocl_options);
@@ -94,6 +92,17 @@ void BlobDetector::set_drcfg(const drcfg_t& drcfg)
 {
   m_drcfg = drcfg;
 }
+//}
+
+/* BlobDetector::set_lut() method //{ */
+
+void BlobDetector::set_lut(cv::InputArray lut)
+{
+  lut.copyTo(m_lut);
+  lut.copyTo(m_ulut);
+  ROS_INFO("[BlobDetector]: New LUT table was loaded.");
+}
+
 //}
 
 /* BlobDetector::load_ocl_kernel() method //{ */
