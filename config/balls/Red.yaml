@@ -1,8 +1,8 @@
 ball:
   binarization_method_name: HSV
-  hsv: {hue_center: 171.97738473311142, hue_range: 16.613683501427438, sat_center: 210.48720454794721,
-    sat_range: 142.38185822179116, val_center: 86.83806915067335, val_range: 186.75711109778845}
-  lab: {a_center: 160.101306744705, a_range: 59.461651556720035, b_center: 137.54031395261185,
-    b_range: 45.59269139597738, l_center: 45.053534849158076, l_range: 120.50882914348827}
+  hsv: {hue_center: 170.05140563888955, hue_range: 16.190763570021787, sat_center: 190.37948717948717,
+    sat_range: 117.4122119129345, val_center: 75.61814820143624, val_range: 134.03001966187}
+  lab: {a_center: 156.0652454429628, a_range: 15.380133683251746, b_center: 130.2953773581491,
+    b_range: 22.859446909282983, l_center: 41.51255248374814, l_range: 57.498207158391864}
   physical_diameter: 0.15
-  segment_color_name: red.yaml
+  segment_color_name: red

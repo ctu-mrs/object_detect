@@ -139,7 +139,7 @@ namespace object_detect
       static ros_cov_t generate_covariance(const Eigen::Vector3f& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);
-      void highlight_mask(cv::Mat& img, cv::Mat label_img);
+      void highlight_mask(cv::Mat& img, const cv::Mat label_img, const cv::Scalar color, const bool invert = false);
       void load_ball_to_dynrec(mrs_lib::ParamLoader& pl);
 
     private:
@@ -153,6 +153,7 @@ namespace object_detect
       double m_max_dist_diff;
       double m_min_depth;
       double m_max_depth;
+      std::string m_mask_filename;
       std::string m_ocl_lut_kernel_file;
       std::map<dist_qual_t, std::pair<double&, double&>> m_cov_coeffs;
       //}
@@ -190,6 +191,8 @@ namespace object_detect
       std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
       image_geometry::PinholeCameraModel m_dm_camera_model;
       image_geometry::PinholeCameraModel m_rgb_camera_model;
+
+      cv::Mat m_mask;
       //}
   
     private:

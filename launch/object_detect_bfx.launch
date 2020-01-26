@@ -9,8 +9,8 @@
   <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
   <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
 
-  <arg name="color_image" value="bluefox_front/image_raw"/>
-  <arg name="color_cinfo" value="bluefox_front/camera_info"/>
+  <arg name="color_image" value="bluefox3_front/image_raw"/>
+  <arg name="color_cinfo" value="/image_publisher/camera_info"/>
 
   <arg name="standalone" default="true" />
   <arg name="manager" default="object_detect_nodelet_manager" />
@@ -23,8 +23,8 @@
     <node pkg="nodelet" type="nodelet" name="object_detect_bfx" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" >
       
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
-      <rosparam file="$(find object_detect)/config/balls/Yellow.yaml" />
-      <param name="uav_name" value="$(arg uav_name)" />
+      <rosparam file="$(find object_detect)/config/balls/RedBfx.yaml" />
+      <param name="mask_filename" value="$(find object_detect)/mask/bluefox3_front.bmp" />
 
       <param name="ocl_lut_kernel_file" value="$(find object_detect)/src/ocl_lut_kernel.cl" />
 

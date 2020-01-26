@@ -62,7 +62,7 @@ namespace object_detect
       }
       //}
 
-      /* get ball candidates //{ */
+      /* Get ball candidates //{ */
       NODELET_INFO_THROTTLE(0.5, "[ObjectDetector]: Segmenting %s color (by %s) %d",
           color_name(color_id_t(m_drmgr_ptr->config.segment_color)).c_str(),
           binarization_method_name(bin_method_t(m_drmgr_ptr->config.binarization_method)).c_str(), m_drmgr_ptr->config.segment_color);
@@ -70,10 +70,14 @@ namespace object_detect
       {
         std::scoped_lock lck(m_blob_det_mtx);
         m_blob_det.set_drcfg(m_drmgr_ptr->config);
-        balls = m_blob_det.detect_candidates(rgb_img, label_img);
+        balls = m_blob_det.detect_candidates(rgb_img, m_mask, label_img);
       }
       if (publish_debug)
-        highlight_mask(dbg_img, label_img);
+      {
+        highlight_mask(dbg_img, label_img, cv::Scalar(128, 0, 0));
+        if (!m_mask.empty())
+          highlight_mask(dbg_img, m_mask, cv::Scalar(0, 0, 128));
+      }
       //}
 
       /* Calculate 3D positions of the detected balls //{ */
@@ -424,7 +428,7 @@ namespace object_detect
   //}
 
   /* highlight_mask() method //{ */
-  void ObjectDetector::highlight_mask(cv::Mat& img, cv::Mat label_img)
+  void ObjectDetector::highlight_mask(cv::Mat& img, const cv::Mat label_img, const cv::Scalar color, const bool invert)
   {
     assert(img.size() == label_img.size());
     assert(img.channels() == 3);
@@ -441,9 +445,9 @@ namespace object_detect
       uint8_t* dptr = img.ptr<uint8_t>(i);
       for (int j = 0; j < size.width; j++)
       {
-        if (sptr[j])
+        if (sptr[j] != invert)
         {
-          const cv::Scalar color = color_highlight(color_id_t(sptr[j]));
+          /* const cv::Scalar color = color_highlight(color_id_t(sptr[j])); */
           uint8_t& b = dptr[3*j + 0];
           uint8_t& g = dptr[3*j + 1];
           uint8_t& r = dptr[3*j + 2];
@@ -479,6 +483,7 @@ namespace object_detect
     pl.load_param("max_dist_diff", m_max_dist_diff);
     pl.load_param("min_depth", m_min_depth);
     pl.load_param("max_depth", m_max_depth);
+    pl.load_param("mask_filename", m_mask_filename, ""s);
     const std::string ocl_lut_kernel_file = pl.load_param2<std::string>("ocl_lut_kernel_file");
     const bool use_ocl = pl.load_param2<bool>("use_ocl");
 
@@ -538,7 +543,28 @@ namespace object_detect
 
     //}
 
-    m_prev_color_id = m_drmgr_ptr->config.segment_color;
+    /* load the mask //{ */
+    
+    if (!m_mask_filename.empty())
+    {
+      m_mask = cv::imread(m_mask_filename, cv::IMREAD_GRAYSCALE);
+      cv::imshow("mask", m_mask);
+      cv::waitKey(1);asd
+      if (m_mask.empty())
+      {
+        ROS_ERROR("[%s]: Error loading image mask from file '%s'! Ending node.", m_node_name.c_str(), m_mask_filename.c_str());
+        ros::shutdown();
+      } else if (m_mask.type() != CV_8UC1)
+      {
+        ROS_ERROR("[%s]: Loaded image mask has unexpected type: '%u' (expected %u)! Ending node.", m_node_name.c_str(), m_mask.type(), CV_8UC1);
+        ros::shutdown();
+      }
+    }
+    
+    //}
+
+    /* generate the LUT //{ */
+    
     {
       const auto lut = regenerate_lut();
       std::scoped_lock lck(m_blob_det_mtx);
@@ -551,6 +577,8 @@ namespace object_detect
         m_blob_det = BlobDetector(lut);
       }
     }
+    
+    //}
 
     m_srv_regenerate_lut = m_nh.advertiseService("regenerate_lut", &ObjectDetector::cbk_regenerate_lut, this);
 
@@ -582,34 +610,36 @@ namespace object_detect
 
   //}
 
+  /* load_ball_to_dynrec() method //{ */
   void ObjectDetector::load_ball_to_dynrec(mrs_lib::ParamLoader& pl)
   {
     drcfg_t cfg = m_drmgr_ptr->config;
-
+  
     std::string bin_method_str = pl.load_param2<std::string>("ball/binarization_method_name");
     std::string segment_color = pl.load_param2<std::string>("ball/segment_color_name");
     cfg.binarization_method = binarization_method_id(bin_method_str);
     cfg.segment_color = color_id(segment_color);
     cfg.override_settings = false;
     cfg.ball__physical_diameter = pl.load_param2<double>("ball/physical_diameter");
-
+  
     cfg.ball__lab__l_range = pl.load_param2<int>("ball/lab/l_range");
     cfg.ball__lab__a_range = pl.load_param2<int>("ball/lab/a_range");
     cfg.ball__lab__b_range = pl.load_param2<int>("ball/lab/b_range");
     cfg.ball__lab__l_center = pl.load_param2<int>("ball/lab/l_center");
     cfg.ball__lab__a_center = pl.load_param2<int>("ball/lab/a_center");
     cfg.ball__lab__b_center = pl.load_param2<int>("ball/lab/b_center");
-
+  
     cfg.ball__hsv__hue_range = pl.load_param2<int>("ball/hsv/hue_range");
     cfg.ball__hsv__sat_range = pl.load_param2<int>("ball/hsv/sat_range");
     cfg.ball__hsv__val_range = pl.load_param2<int>("ball/hsv/val_range");
     cfg.ball__hsv__hue_center = pl.load_param2<int>("ball/hsv/hue_center");
     cfg.ball__hsv__sat_center = pl.load_param2<int>("ball/hsv/sat_center");
     cfg.ball__hsv__val_center = pl.load_param2<int>("ball/hsv/val_center");
-
+  
     m_drmgr_ptr->config = cfg;
     m_drmgr_ptr->update_config();
   }
+  //}
 
   /* ObjectDetector::cbk_regenerate_lut() method //{ */
 
