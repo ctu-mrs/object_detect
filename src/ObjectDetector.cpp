@@ -70,13 +70,13 @@ namespace object_detect
       {
         std::scoped_lock lck(m_blob_det_mtx);
         m_blob_det.set_drcfg(m_drmgr_ptr->config);
-        balls = m_blob_det.detect_candidates(rgb_img, m_mask, label_img);
+        balls = m_blob_det.detect_candidates(rgb_img, label_img, m_inv_mask);
       }
       if (publish_debug)
       {
         highlight_mask(dbg_img, label_img, cv::Scalar(128, 0, 0));
-        if (!m_mask.empty())
-          highlight_mask(dbg_img, m_mask, cv::Scalar(0, 0, 128));
+        if (!m_inv_mask.empty())
+          highlight_mask(dbg_img, m_inv_mask, cv::Scalar(0, 0, 128));
       }
       //}
 
@@ -547,17 +547,18 @@ namespace object_detect
     
     if (!m_mask_filename.empty())
     {
-      m_mask = cv::imread(m_mask_filename, cv::IMREAD_GRAYSCALE);
-      cv::imshow("mask", m_mask);
-      cv::waitKey(1);asd
-      if (m_mask.empty())
+      m_inv_mask = cv::imread(m_mask_filename, cv::IMREAD_GRAYSCALE);
+      if (m_inv_mask.empty())
       {
         ROS_ERROR("[%s]: Error loading image mask from file '%s'! Ending node.", m_node_name.c_str(), m_mask_filename.c_str());
         ros::shutdown();
-      } else if (m_mask.type() != CV_8UC1)
+      } else if (m_inv_mask.type() != CV_8UC1)
       {
-        ROS_ERROR("[%s]: Loaded image mask has unexpected type: '%u' (expected %u)! Ending node.", m_node_name.c_str(), m_mask.type(), CV_8UC1);
+        ROS_ERROR("[%s]: Loaded image mask has unexpected type: '%u' (expected %u)! Ending node.", m_node_name.c_str(), m_inv_mask.type(), CV_8UC1);
         ros::shutdown();
+      } else
+      {
+        cv::bitwise_not(m_inv_mask, m_inv_mask);
       }
     }
     

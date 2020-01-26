@@ -281,7 +281,7 @@ void BlobDetector::preprocess_image(cv::Mat& inout_img) const
 //}
 
 /* BlobDetector::detect_candidates() method //{ */
-std::vector<BallCandidate> BlobDetector::detect_candidates(cv::Mat in_img, cv::InputArray mask, cv::OutputArray p_labels_img)
+std::vector<BallCandidate> BlobDetector::detect_candidates(cv::Mat in_img, cv::OutputArray p_labels_img, cv::InputArray inv_mask)
 {
 #ifdef ENABLE_PROFILING
   ros::WallTime t_start = ros::WallTime::now();
@@ -297,8 +297,8 @@ std::vector<BallCandidate> BlobDetector::detect_candidates(cv::Mat in_img, cv::I
   else
     seg_img = segment_lut(in_img, p_labels_img);
 
-  if (!mask.empty())
-    seg_img.copyTo(seg_img, mask);
+  if (!inv_mask.empty())
+    seg_img.setTo(0, inv_mask);
   const uint8_t label = (uint8_t)m_drcfg.segment_color;
   postprocess_binary_image(seg_img);
   const std::vector<Blob> blobs = find_blobs(seg_img, label);

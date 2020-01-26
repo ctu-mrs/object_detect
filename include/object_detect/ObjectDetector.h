@@ -192,7 +192,7 @@ namespace object_detect
       image_geometry::PinholeCameraModel m_dm_camera_model;
       image_geometry::PinholeCameraModel m_rgb_camera_model;
 
-      cv::Mat m_mask;
+      cv::Mat m_inv_mask;
       //}
   
     private:
