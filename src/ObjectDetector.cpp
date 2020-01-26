@@ -201,7 +201,6 @@ namespace object_detect
         for (size_t it = 0; it < balls.size(); ++it, ++iter_x, ++iter_y, ++iter_z, ++iter_type, ++iter_dist_qual)
         {
           const auto& ball = balls.at(it);
-          cerr << "adding position to pcl: " << ball.position << std::endl;
           *iter_x = ball.position.x();
           *iter_y = ball.position.y();
           *iter_z = ball.position.z();
