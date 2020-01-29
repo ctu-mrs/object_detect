@@ -1,9 +1,8 @@
-binarization_method_name: HSV
-hsv: {
-  hue_center: 30, hue_range: 20,
-  sat_center: 255, sat_range: 256,
-  val_center: 128, val_range: 256
-  }
-lab: {a_center: 173.13601532567048, a_range: 29.579620014972786, b_center: 99.29150702426564,
-  b_range: 30.96752501725443, l_center: 101.15453384418902, l_range: 182.87309050056473}
-physical_radius: 0.075
+ball:
+  binarization_method_name: LAB
+  hsv: {hue_center: 22.08134297834892, hue_range: 27.475394519956993, sat_center: 132.8167435064432,
+    sat_range: 106.7329656346041, val_center: 217.27312555253746, val_range: 324.4436060907296}
+  lab: {a_center: 127.63028268375069, a_range: 56.02700129524061, b_center: 170.98557880175153,
+    b_range: 53.701903141539795, l_center: 195.99659005520405, l_range: 398.63765114424626}
+  physical_diameter: 0.11
+  segment_color_name: yellow
