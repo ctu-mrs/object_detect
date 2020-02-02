@@ -641,7 +641,7 @@ std::vector<BallCandidate> BlobDetector::blobs_to_balls(const std::vector<Blob>&
   for (const auto& blob : blobs)
   {
     BallCandidate ball;
-    ball.type = m_drcfg.segment_color;
+    ball.type = m_drcfg.ball__segment_color_name;
     ball.location = blob.location;
     ball.radius = blob.radius;
     ret.push_back(ball);

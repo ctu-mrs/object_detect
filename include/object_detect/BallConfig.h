@@ -7,11 +7,11 @@
 namespace object_detect
 {
   using cfg_t = object_detect::DetectionParamsConfig;
-  using ball_params_t = cfg_t::DEFAULT::BALL_PARAMETERS;
+  using ball_params_t = cfg_t;
 
   struct BallConfig
   {
-    ball_params_t params;
+    cfg_t params;
     lutss_t lutss;
   };
 }

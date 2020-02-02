@@ -79,7 +79,7 @@ namespace object_detect
       ObjectDetector() : m_node_name("ObjectDetector") {};
       virtual void onInit();
       bool cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp);
-      object_detect::lut_t regenerate_lut(const BallConfig& ball_config);
+      std::optional<object_detect::lut_t> regenerate_lut(const BallConfig& ball_config);
 
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);

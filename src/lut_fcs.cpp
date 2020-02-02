@@ -396,7 +396,7 @@ namespace object_detect
 
   /* generate_lut() //{ */
 
-  lut_t generate_lut(const BallConfig& cfg)
+  std::optional<lut_t> generate_lut(const BallConfig& cfg)
   {
     lut_t ret;
     ret.resize(lut_size);
@@ -417,7 +417,8 @@ namespace object_detect
         add_lut_ablut(ret, cfg);
         break;
       default:
-        std::cerr << "[generate_lut]: Unknown binarization method selected - cannot generate lookup table!";
+        std::cerr << "[generate_lut]: Unknown binarization method selected - cannot generate lookup table!" << std::endl;
+        return std::nullopt;
         break;
     }
     return ret;

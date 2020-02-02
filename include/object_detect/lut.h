@@ -38,6 +38,8 @@ namespace object_detect
     {
       {"hsv", bin_method_t::hsv},
       {"lab", bin_method_t::lab},
+      {"hs_lut", bin_method_t::hs_lut},
+      {"ab_lut", bin_method_t::ab_lut},
     };
   
   bin_method_t binarization_method_id(std::string name);

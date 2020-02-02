@@ -64,7 +64,7 @@ namespace object_detect
 
       /* Get ball candidates //{ */
       NODELET_INFO_THROTTLE(0.5, "[ObjectDetector]: Segmenting '%s' color (by %s)",
-          m_drmgr_ptr->config.segment_color.c_str(),
+          m_drmgr_ptr->config.ball__segment_color_name.c_str(),
           binarization_method_name(bin_method_t(m_drmgr_ptr->config.binarization_method)).c_str());
       std::vector<BallCandidate> balls;
       {
@@ -502,8 +502,7 @@ namespace object_detect
     //}
 
     BallConfig ball_config = load_ball_config(pl);
-    m_drmgr_ptr->config.groups.ball_parameters = ball_config.params;
-    m_drmgr_ptr->update_config();
+    load_ball_to_dynrec(ball_config.params);
 
     double loop_rate = pl.load_param2<double>("loop_rate", 100);
 
@@ -564,15 +563,24 @@ namespace object_detect
     /* generate the LUT //{ */
     
     {
-      const auto lut = regenerate_lut(ball_config);
-      std::scoped_lock lck(m_blob_det_mtx);
-      if (use_ocl)
+      const auto lut_opt = regenerate_lut(ball_config);
+      if (lut_opt.has_value())
       {
-        m_blob_det = BlobDetector(ocl_lut_kernel_file, lut);
-        ROS_INFO("[%s]: Using OpenCL HW acceleration.", m_node_name.c_str());
-      } else
+        const auto& lut = lut_opt.value();
+        std::scoped_lock lck(m_blob_det_mtx);
+        if (use_ocl)
+        {
+          m_blob_det = BlobDetector(ocl_lut_kernel_file, lut);
+          ROS_INFO("[%s]: Using OpenCL HW acceleration.", m_node_name.c_str());
+        } else
+        {
+          m_blob_det = BlobDetector(lut);
+        }
+      }
+      else
       {
-        m_blob_det = BlobDetector(lut);
+        ROS_ERROR("[ObjectDetector]: Invalid options set! Could not generate LUT.");
+        ros::shutdown();
       }
     }
     
@@ -595,24 +603,47 @@ namespace object_detect
 
   /* ObjectDetector::regenerate_lut() method //{ */
 
-  object_detect::lut_t ObjectDetector::regenerate_lut(const BallConfig& ball_config)
+  std::optional<object_detect::lut_t> ObjectDetector::regenerate_lut(const BallConfig& ball_config)
   {
     const auto lut_start_time = ros::WallTime::now();
     ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
-    const auto lut = generate_lut(ball_config);
-    const auto lut_end_time = ros::WallTime::now();
-    const auto lut_dur = lut_end_time - lut_start_time;
-    ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
-    return lut;
+    const auto lut_opt = generate_lut(ball_config);
+    if (lut_opt.has_value())
+    {
+      const auto lut_end_time = ros::WallTime::now();
+      const auto lut_dur = lut_end_time - lut_start_time;
+      ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
+    }
+    return lut_opt;
   }
 
   //}
 
   /* load_ball_to_dynrec() method //{ */
-  void ObjectDetector::load_ball_to_dynrec(const ball_params_t& params)
+  void ObjectDetector::load_ball_to_dynrec(const ball_params_t& ball_params)
   {
     drcfg_t cfg = m_drmgr_ptr->config;
-    cfg.groups.ball_parameters = params;
+
+    cfg.override_settings = ball_params.override_settings;
+    cfg.binarization_method = ball_params.binarization_method;
+
+    cfg.ball__segment_color_name = ball_params.ball__segment_color_name;
+    cfg.ball__physical_diameter = ball_params.ball__physical_diameter;
+  
+    cfg.ball__lab__l_range = ball_params.ball__lab__l_range;
+    cfg.ball__lab__a_range = ball_params.ball__lab__a_range;
+    cfg.ball__lab__b_range = ball_params.ball__lab__b_range;
+    cfg.ball__lab__l_center = ball_params.ball__lab__l_center;
+    cfg.ball__lab__a_center = ball_params.ball__lab__a_center;
+    cfg.ball__lab__b_center = ball_params.ball__lab__b_center;
+  
+    cfg.ball__hsv__hue_range = ball_params.ball__hsv__hue_range;
+    cfg.ball__hsv__sat_range = ball_params.ball__hsv__sat_range;
+    cfg.ball__hsv__val_range = ball_params.ball__hsv__val_range;
+    cfg.ball__hsv__hue_center = ball_params.ball__hsv__hue_center;
+    cfg.ball__hsv__sat_center = ball_params.ball__hsv__sat_center;
+    cfg.ball__hsv__val_center = ball_params.ball__hsv__val_center;
+
     m_drmgr_ptr->config = cfg;
     m_drmgr_ptr->update_config();
   }
@@ -628,7 +659,7 @@ namespace object_detect
     std::string bin_method_str = pl.load_param2<std::string>("ball/binarization_method_name");
     ball_params.binarization_method = binarization_method_id(bin_method_str);
 
-    pl.load_param("ball/segment_color_name", ball_params.segment_color);
+    pl.load_param("ball/segment_color_name", ball_params.ball__segment_color_name);
     pl.load_param("ball/physical_diameter", ball_params.ball__physical_diameter);
   
     pl.load_param("ball/lab/l_range", ball_params.ball__lab__l_range);
@@ -673,19 +704,29 @@ namespace object_detect
     
     if (!pl.loaded_successfully() || !m_drmgr_ptr->loaded_successfully())
     {
+      ROS_ERROR("[ObjectDetector]: Invalid options set! Using old LUT.");
       resp.message = "Could not load some compulsory parameters!";
       resp.success = false;
       return true;
     }
 
-    const auto lut = regenerate_lut(ball_config);
+    const auto lut_opt = regenerate_lut(ball_config);
+    if (lut_opt.has_value())
     {
+      const auto& lut = lut_opt.value();
       std::scoped_lock lck(m_blob_det_mtx);
       m_blob_det.set_lut(lut);
+      resp.message = "The LUT table was regenerated.";
+      resp.success = true;
+      return true;
     }
-    resp.message = "The LUT table was regenerated.";
-    resp.success = true;
-    return true;
+    else
+    {
+      ROS_ERROR("[ObjectDetector]: Invalid options set! Using old LUT.");
+      resp.message = "Could not generate LUT - invalid options.";
+      resp.success = true;
+      return true;
+    }
   }
 
   //}
