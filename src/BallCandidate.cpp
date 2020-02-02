@@ -2,6 +2,25 @@
 
 namespace object_detect
 {
+  dist_qual_t dist_qual_id(std::string name)
+  {
+    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+    if (dist_qual2id.find(name) == std::end(dist_qual2id))
+      return dist_qual_t::unknown_qual;
+    else
+      return dist_qual2id.at(name);
+  }
+  
+  std::string dist_qual_name(dist_qual_t id)
+  {
+    for (const auto& keyval : dist_qual2id)
+    {
+      if (keyval.second == id)
+        return keyval.first;
+    }
+    return "unknown";
+  }
+
   cv::Rect circle_roi_clamped(const cv::Point2d& center, const double radius, const cv::Size& limits)
   {
     cv::Point tmp_topleft(std::floor(center.x - radius), std::floor(center.y - radius));

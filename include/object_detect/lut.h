@@ -1,33 +1,52 @@
-#ifndef SEGCONF_H
-#define SEGCONF_H
+#ifndef LUT_H
+#define LUT_H
 
 #include <iostream>
 #include <vector>
 #include <memory>
 #include <stdint.h>
 #include <opencv2/imgproc/imgproc.hpp>
-#include "object_detect/color_mapping.h"
-#include <object_detect/DetectionParamsConfig.h>
+#include <map>
 
 namespace object_detect
 {
-  using drcfg_t = object_detect::DetectionParamsConfig;
-
   constexpr size_t lut_dim = 256;
   constexpr size_t lut_size = lut_dim*lut_dim*lut_dim;
   using lut_elem_t = uint8_t;
   using lut_t = std::vector<lut_elem_t>;
+
+  struct lutss_t
+  {
+    lut_t lut;
+    int subsampling_x;
+    int subsampling_y;
+    int subsampling_z;
+  };
 
   enum bin_method_t
   {
     unknown_method = -1,
     hsv = 0,
     lab = 1,
+    hs_lut = 2,
+    ab_lut = 3,
   };
 
-  lut_t generate_lut(const drcfg_t& drcfg);
-  lut_elem_t lookup_lut(cv::InputArray lut, size_t r, size_t g, size_t b);
+  /* helper functions for bin_method_t //{ */
+  
+  static std::map<std::string, bin_method_t> binname2id =
+    {
+      {"hsv", bin_method_t::hsv},
+      {"lab", bin_method_t::lab},
+    };
+  
+  bin_method_t binarization_method_id(std::string name);
+  
+  std::string binarization_method_name(bin_method_t id);
+  
+  
+  //}
 
 }
 
-#endif // SEGCONF_H
+#endif // LUT_H

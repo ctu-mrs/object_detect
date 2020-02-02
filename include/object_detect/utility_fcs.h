@@ -5,6 +5,7 @@
 #include <Eigen/Geometry>
 #include <image_geometry/pinhole_camera_model.h>
 #include <opencv2/imgproc/imgproc.hpp>
+#include "object_detect/lut_fcs.h"
 
 /** Utility functions //{**/
 

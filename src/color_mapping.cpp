@@ -2,7 +2,8 @@
 
 namespace object_detect
 {
-  /* binarization_method_id() and color_id() helper functions //{ */
+
+  /* color_id_t helper functions //{ */
   color_id_t color_id(std::string name)
   {
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);

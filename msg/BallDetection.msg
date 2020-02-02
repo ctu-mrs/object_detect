@@ -1,2 +1,2 @@
-int16                            type
+string                           type
 geometry_msgs/PoseWithCovariance pose

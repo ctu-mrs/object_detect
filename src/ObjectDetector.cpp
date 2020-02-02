@@ -63,9 +63,9 @@ namespace object_detect
       //}
 
       /* Get ball candidates //{ */
-      NODELET_INFO_THROTTLE(0.5, "[ObjectDetector]: Segmenting %s color (by %s) %d",
-          color_name(color_id_t(m_drmgr_ptr->config.segment_color)).c_str(),
-          binarization_method_name(bin_method_t(m_drmgr_ptr->config.binarization_method)).c_str(), m_drmgr_ptr->config.segment_color);
+      NODELET_INFO_THROTTLE(0.5, "[ObjectDetector]: Segmenting '%s' color (by %s)",
+          m_drmgr_ptr->config.segment_color.c_str(),
+          binarization_method_name(bin_method_t(m_drmgr_ptr->config.binarization_method)).c_str());
       std::vector<BallCandidate> balls;
       {
         std::scoped_lock lck(m_blob_det_mtx);
@@ -91,7 +91,7 @@ namespace object_detect
         const cv::Point& center = ball.location;
         const float px_radius = ball.radius;
         const bool physical_dimension_known = m_drmgr_ptr->config.ball__physical_diameter > 0.0;
-        std::string name_upper = color_name(color_id_t(ball.type));
+        std::string name_upper = ball.type;
         std::transform(name_upper.begin(), name_upper.end(), name_upper.begin(), ::toupper);
         /* cout << "object classified as " << name_upper << " ball" << std::endl; */
 
@@ -208,7 +208,7 @@ namespace object_detect
           *iter_x = ball.position.x();
           *iter_y = ball.position.y();
           *iter_z = ball.position.z();
-          *iter_type = ball.type;
+          *iter_type = color_id(ball.type);
           *iter_dist_qual = ball.dist_qual;
         }
 
@@ -501,11 +501,8 @@ namespace object_detect
     
     //}
 
-    const std::string bin_method_str = pl.load_param2<std::string>("ball/binarization_method_name");
-    const std::string segment_color = pl.load_param2<std::string>("ball/segment_color_name");
-    m_drmgr_ptr->config.binarization_method = binarization_method_id(bin_method_str);
-    m_drmgr_ptr->config.segment_color = color_id(segment_color);
-    m_drmgr_ptr->config.override_settings = false;
+    BallConfig ball_config = load_ball_config(pl);
+    m_drmgr_ptr->config.groups.ball_parameters = ball_config.params;
     m_drmgr_ptr->update_config();
 
     double loop_rate = pl.load_param2<double>("loop_rate", 100);
@@ -567,7 +564,7 @@ namespace object_detect
     /* generate the LUT //{ */
     
     {
-      const auto lut = regenerate_lut();
+      const auto lut = regenerate_lut(ball_config);
       std::scoped_lock lck(m_blob_det_mtx);
       if (use_ocl)
       {
@@ -598,11 +595,11 @@ namespace object_detect
 
   /* ObjectDetector::regenerate_lut() method //{ */
 
-  object_detect::lut_t ObjectDetector::regenerate_lut()
+  object_detect::lut_t ObjectDetector::regenerate_lut(const BallConfig& ball_config)
   {
     const auto lut_start_time = ros::WallTime::now();
     ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
-    const auto lut = generate_lut(m_drmgr_ptr->config);
+    const auto lut = generate_lut(ball_config);
     const auto lut_end_time = ros::WallTime::now();
     const auto lut_dur = lut_end_time - lut_start_time;
     ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
@@ -612,33 +609,56 @@ namespace object_detect
   //}
 
   /* load_ball_to_dynrec() method //{ */
-  void ObjectDetector::load_ball_to_dynrec(mrs_lib::ParamLoader& pl)
+  void ObjectDetector::load_ball_to_dynrec(const ball_params_t& params)
   {
     drcfg_t cfg = m_drmgr_ptr->config;
-  
-    std::string bin_method_str = pl.load_param2<std::string>("ball/binarization_method_name");
-    std::string segment_color = pl.load_param2<std::string>("ball/segment_color_name");
-    cfg.binarization_method = binarization_method_id(bin_method_str);
-    cfg.segment_color = color_id(segment_color);
-    cfg.override_settings = false;
-    cfg.ball__physical_diameter = pl.load_param2<double>("ball/physical_diameter");
-  
-    cfg.ball__lab__l_range = pl.load_param2<int>("ball/lab/l_range");
-    cfg.ball__lab__a_range = pl.load_param2<int>("ball/lab/a_range");
-    cfg.ball__lab__b_range = pl.load_param2<int>("ball/lab/b_range");
-    cfg.ball__lab__l_center = pl.load_param2<int>("ball/lab/l_center");
-    cfg.ball__lab__a_center = pl.load_param2<int>("ball/lab/a_center");
-    cfg.ball__lab__b_center = pl.load_param2<int>("ball/lab/b_center");
-  
-    cfg.ball__hsv__hue_range = pl.load_param2<int>("ball/hsv/hue_range");
-    cfg.ball__hsv__sat_range = pl.load_param2<int>("ball/hsv/sat_range");
-    cfg.ball__hsv__val_range = pl.load_param2<int>("ball/hsv/val_range");
-    cfg.ball__hsv__hue_center = pl.load_param2<int>("ball/hsv/hue_center");
-    cfg.ball__hsv__sat_center = pl.load_param2<int>("ball/hsv/sat_center");
-    cfg.ball__hsv__val_center = pl.load_param2<int>("ball/hsv/val_center");
-  
+    cfg.groups.ball_parameters = params;
     m_drmgr_ptr->config = cfg;
     m_drmgr_ptr->update_config();
+  }
+  //}
+
+  /* load_ball_config() method //{ */
+  BallConfig ObjectDetector::load_ball_config(mrs_lib::ParamLoader& pl)
+  {
+    BallConfig ball_config;
+    auto& ball_params = ball_config.params;
+
+    ball_params.override_settings = false;
+    std::string bin_method_str = pl.load_param2<std::string>("ball/binarization_method_name");
+    ball_params.binarization_method = binarization_method_id(bin_method_str);
+
+    pl.load_param("ball/segment_color_name", ball_params.segment_color);
+    pl.load_param("ball/physical_diameter", ball_params.ball__physical_diameter);
+  
+    pl.load_param("ball/lab/l_range", ball_params.ball__lab__l_range);
+    pl.load_param("ball/lab/a_range", ball_params.ball__lab__a_range);
+    pl.load_param("ball/lab/b_range", ball_params.ball__lab__b_range);
+    pl.load_param("ball/lab/l_center", ball_params.ball__lab__l_center);
+    pl.load_param("ball/lab/a_center", ball_params.ball__lab__a_center);
+    pl.load_param("ball/lab/b_center", ball_params.ball__lab__b_center);
+  
+    pl.load_param("ball/hsv/hue_range", ball_params.ball__hsv__hue_range);
+    pl.load_param("ball/hsv/sat_range", ball_params.ball__hsv__sat_range);
+    pl.load_param("ball/hsv/val_range", ball_params.ball__hsv__val_range);
+    pl.load_param("ball/hsv/hue_center", ball_params.ball__hsv__hue_center);
+    pl.load_param("ball/hsv/sat_center", ball_params.ball__hsv__sat_center);
+    pl.load_param("ball/hsv/val_center", ball_params.ball__hsv__val_center);
+
+    if (ball_params.binarization_method == bin_method_t::ab_lut || ball_params.binarization_method == bin_method_t::hs_lut)
+    {
+      std::vector<int> lut_data;
+      pl.load_param("ball/lut/data", lut_data);
+      pl.load_param("ball/lut/subsampling/x", ball_config.lutss.subsampling_x);
+      pl.load_param("ball/lut/subsampling/y", ball_config.lutss.subsampling_y);
+      pl.load_param("ball/lut/subsampling/z", ball_config.lutss.subsampling_z, 0);
+
+      ball_config.lutss.lut.reserve(lut_data.size());
+      for (const auto el : lut_data)
+        ball_config.lutss.lut.push_back(el);
+    }
+
+    return ball_config;
   }
   //}
 
@@ -647,7 +667,10 @@ namespace object_detect
   bool ObjectDetector::cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp)
   {
     mrs_lib::ParamLoader pl(m_nh);
-    load_ball_to_dynrec(pl);
+
+    auto ball_config = load_ball_config(pl);
+    load_ball_to_dynrec(ball_config.params);
+    
     if (!pl.loaded_successfully() || !m_drmgr_ptr->loaded_successfully())
     {
       resp.message = "Could not load some compulsory parameters!";
@@ -655,7 +678,7 @@ namespace object_detect
       return true;
     }
 
-    const auto lut = regenerate_lut();
+    const auto lut = regenerate_lut(ball_config);
     {
       std::scoped_lock lck(m_blob_det_mtx);
       m_blob_det.set_lut(lut);

@@ -13,7 +13,7 @@
 // local includes
 #include <object_detect/DetectionParamsConfig.h>
 #include "object_detect/BallCandidate.h"
-#include "object_detect/lut.h"
+#include "object_detect/lut_fcs.h"
 
 namespace object_detect
 {

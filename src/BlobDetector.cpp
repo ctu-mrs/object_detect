@@ -299,7 +299,7 @@ std::vector<BallCandidate> BlobDetector::detect_candidates(cv::Mat in_img, cv::O
 
   if (!inv_mask.empty())
     seg_img.setTo(0, inv_mask);
-  const uint8_t label = (uint8_t)m_drcfg.segment_color;
+  const uint8_t label = 1;
   postprocess_binary_image(seg_img);
   const std::vector<Blob> blobs = find_blobs(seg_img, label);
   const auto balls = blobs_to_balls(blobs);
@@ -325,7 +325,7 @@ std::vector<BallCandidate> BlobDetector::detect_candidates(cv::Mat in_img, cv::O
 /* BlobDetector::segment_lut() method //{ */
 cv::Mat BlobDetector::segment_lut(cv::Mat in_img, cv::OutputArray p_labels_img)
 {
-  const uint8_t label = (uint8_t)m_drcfg.segment_color;
+  const uint8_t label = 1;
   std::vector<uint8_t> labels = {label};
   cv::Mat bin_imgs;
 
@@ -347,17 +347,24 @@ cv::Mat BlobDetector::segment_ranges(cv::Mat in_img, cv::OutputArray p_labels_im
   p_labels_img.setTo(0);
 
   cv::Mat seg_img;
-  if (m_drcfg.binarization_method == bin_method_t::hsv)
+  switch (m_drcfg.binarization_method)
   {
-    cv::Mat prep_img;
-    cv::cvtColor(in_img, prep_img, cv::COLOR_BGR2HSV);
-    seg_img = threshold_hsv(prep_img);
-  }
-  else
-  {
-    cv::Mat prep_img;
-    cv::cvtColor(in_img, prep_img, cv::COLOR_BGR2Lab);
-    seg_img = threshold_lab(prep_img);
+  case bin_method_t::hsv:
+            {
+              cv::Mat prep_img;
+              cv::cvtColor(in_img, prep_img, cv::COLOR_BGR2HSV);
+              seg_img = threshold_hsv(prep_img);
+            }
+            break;
+  default:
+            ROS_ERROR("[BlobDetector]: Invalid method selected for range-based segmentation: '%s'! Reverting to L*a*b*.", binarization_method_name(bin_method_t(m_drcfg.binarization_method)).c_str());
+  case bin_method_t::lab:
+            {
+              cv::Mat prep_img;
+              cv::cvtColor(in_img, prep_img, cv::COLOR_BGR2Lab);
+              seg_img = threshold_lab(prep_img);
+            }
+            break;
   }
   return seg_img;
 }

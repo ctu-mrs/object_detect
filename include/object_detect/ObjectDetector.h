@@ -49,11 +49,12 @@
 // Includes from this package
 #include <object_detect/BallDetections.h>
 #include <object_detect/DetectionParamsConfig.h>
+#include "object_detect/BallConfig.h"
 #include "object_detect/BallCandidate.h"
 #include "object_detect/BlobDetector.h"
 #include "object_detect/utility_fcs.h"
 #include "object_detect/color_mapping.h"
-#include "object_detect/lut.h"
+#include "object_detect/lut_fcs.h"
 
 //}
 
@@ -63,59 +64,6 @@ namespace object_detect
 {
   // shortcut type to the dynamic reconfigure manager template instance
   typedef mrs_lib::DynamicReconfigureMgr<object_detect::DetectionParamsConfig> drmgr_t;
-
-  static std::map<std::string, bin_method_t> binname2id =
-    {
-      {"hsv", bin_method_t::hsv},
-      {"lab", bin_method_t::lab},
-    };
-  static std::map<std::string, dist_qual_t> dist_qual2id =
-  {
-    {"no_estimate", dist_qual_t::no_estimate},
-    {"blob_size", dist_qual_t::blob_size},
-    {"depthmap", dist_qual_t::depthmap},
-    {"both", dist_qual_t::both},
-  };
-
-  /* binarization_method_id() and color_id() helper functions //{ */
-  bin_method_t binarization_method_id(std::string name)
-  {
-    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-    if (binname2id.find(name) == std::end(binname2id))
-      return bin_method_t::unknown_method;
-    else
-      return binname2id.at(name);
-  }
-
-  std::string binarization_method_name(bin_method_t id)
-  {
-    for (const auto& keyval : binname2id)
-    {
-      if (keyval.second == id)
-        return keyval.first;
-    }
-    return "unknown";
-  }
-
-  dist_qual_t dist_qual_id(std::string name)
-  {
-    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-    if (dist_qual2id.find(name) == std::end(dist_qual2id))
-      return dist_qual_t::unknown_qual;
-    else
-      return dist_qual2id.at(name);
-  }
-
-  std::string dist_qual_name(dist_qual_t id)
-  {
-    for (const auto& keyval : dist_qual2id)
-    {
-      if (keyval.second == id)
-        return keyval.first;
-    }
-    return "unknown";
-  }
-  //}
 
   /* //{ class ObjectDetector */
 
@@ -131,7 +79,7 @@ namespace object_detect
       ObjectDetector() : m_node_name("ObjectDetector") {};
       virtual void onInit();
       bool cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp);
-      object_detect::lut_t regenerate_lut();
+      object_detect::lut_t regenerate_lut(const BallConfig& ball_config);
 
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
@@ -140,7 +88,8 @@ namespace object_detect
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);
       void highlight_mask(cv::Mat& img, const cv::Mat label_img, const cv::Scalar color, const bool invert = false);
-      void load_ball_to_dynrec(mrs_lib::ParamLoader& pl);
+      void load_ball_to_dynrec(const ball_params_t& params);
+      BallConfig load_ball_config(mrs_lib::ParamLoader& pl);
 
     private:
       // --------------------------------------------------------------
