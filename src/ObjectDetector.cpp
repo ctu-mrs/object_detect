@@ -19,6 +19,21 @@ namespace object_detect
       m_rgb_camera_model.fromCameraInfo(m_sh_rgb_cinfo->get_data());
     //}
 
+    /* load covariance coefficients from dynparam //{ */
+    
+    {
+      const std::pair<double&, double&> cov_coeffs_no_estimate = {m_drmgr_ptr->config.cov_coeffs__xy__no_estimate, m_drmgr_ptr->config.cov_coeffs__z__no_estimate};
+      const std::pair<double&, double&> cov_coeffs_blob_size = {m_drmgr_ptr->config.cov_coeffs__xy__blob_size, m_drmgr_ptr->config.cov_coeffs__z__blob_size};
+      const std::pair<double&, double&> cov_coeffs_depthmap = {m_drmgr_ptr->config.cov_coeffs__xy__depthmap, m_drmgr_ptr->config.cov_coeffs__z__depthmap};
+      const std::pair<double&, double&> cov_coeffs_both = {m_drmgr_ptr->config.cov_coeffs__xy__both, m_drmgr_ptr->config.cov_coeffs__z__both};
+      m_cov_coeffs.insert_or_assign(dist_qual_t::no_estimate, cov_coeffs_no_estimate);
+      m_cov_coeffs.insert_or_assign(dist_qual_t::blob_size, cov_coeffs_blob_size);
+      m_cov_coeffs.insert_or_assign(dist_qual_t::depthmap, cov_coeffs_depthmap);
+      m_cov_coeffs.insert_or_assign(dist_qual_t::both, cov_coeffs_both);
+    }
+    
+    //}
+
     const bool rgb_ready = m_sh_rgb->new_data() && m_sh_rgb_cinfo->used_data();
     const bool dm_ready = m_sh_dm->new_data() && m_sh_dm_cinfo->used_data();
 
@@ -486,20 +501,6 @@ namespace object_detect
     pl.load_param("mask_filename", m_mask_filename, ""s);
     const std::string ocl_lut_kernel_file = pl.load_param2<std::string>("ocl_lut_kernel_file");
     const bool use_ocl = pl.load_param2<bool>("use_ocl");
-
-    /* load covariance coefficients //{ */
-    
-    // admittedly a pretty fcking overcomplicated way to do this, but I'm home bored, so whatever
-    const std::pair<double&, double&> cov_coeffs_no_estimate = {m_drmgr_ptr->config.cov_coeffs__xy__no_estimate, m_drmgr_ptr->config.cov_coeffs__z__no_estimate};
-    const std::pair<double&, double&> cov_coeffs_blob_size = {m_drmgr_ptr->config.cov_coeffs__xy__blob_size, m_drmgr_ptr->config.cov_coeffs__z__blob_size};
-    const std::pair<double&, double&> cov_coeffs_depthmap = {m_drmgr_ptr->config.cov_coeffs__xy__depthmap, m_drmgr_ptr->config.cov_coeffs__z__depthmap};
-    const std::pair<double&, double&> cov_coeffs_both = {m_drmgr_ptr->config.cov_coeffs__xy__both, m_drmgr_ptr->config.cov_coeffs__z__both};
-    m_cov_coeffs.insert({dist_qual_t::no_estimate, cov_coeffs_no_estimate});
-    m_cov_coeffs.insert({dist_qual_t::blob_size, cov_coeffs_blob_size});
-    m_cov_coeffs.insert({dist_qual_t::depthmap, cov_coeffs_depthmap});
-    m_cov_coeffs.insert({dist_qual_t::both, cov_coeffs_both});
-    
-    //}
 
     BallConfig ball_config = load_ball_config(pl);
     load_ball_to_dynrec(ball_config.params);
