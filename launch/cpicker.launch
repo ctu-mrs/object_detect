@@ -1,0 +1,25 @@
+<launch>
+
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+
+  <arg name="debug" default="false" />
+  <arg unless="$(arg debug)" name="launch_prefix_debug" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix_debug" value="debug_roslaunch"/>
+  <arg name="profile" default="false" />
+  <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
+  <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
+
+  <arg name="color_image" value="rs_d435/color/image_raw"/>
+
+  <group ns="$(arg uav_name)">
+
+    <node pkg="object_detect" type="cpicker" name="cpicker" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile)" >
+      <remap from="~image_in" to="$(arg color_image)" />
+    </node>
+
+    <node name="unrepub" pkg="image_transport" type="republish" args="theora in:=/$(arg uav_name)/$(arg color_image) raw out:=/$(arg uav_name)/$(arg color_image)"/>
+  
+  </group>
+
+</launch>
+
