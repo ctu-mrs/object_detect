@@ -1,0 +1,8 @@
+ball:
+  binarization_method_name: HSV
+  hsv: {hue_center: 60.03443591904404, hue_range: 13.407550116919701, sat_center: 252.32520362180924,
+    sat_range: 106.86809015137659, val_center: 88.78557084079713, val_range: 310.75717694145203}
+  lab: {a_center: 88.99335954993282, a_range: 40.594661190745754, b_center: 164.48026407859382,
+    b_range: 64.72700634150996, l_center: 80.24243240595612, l_range: 297.8506801225918}
+  physical_diameter: 0.48
+  segment_color_name: green
