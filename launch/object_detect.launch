@@ -1,9 +1,9 @@
 <launch>
 
   <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
-  <arg name="debug" default="false" />
-
   <arg name="respawn" default="false" />
+
+  <arg name="debug" default="false" />
   <arg unless="$(arg debug)" name="launch_prefix_debug" value=""/>
   <arg     if="$(arg debug)" name="launch_prefix_debug" value="debug_roslaunch"/>
   <arg name="profile" default="false" />
@@ -27,7 +27,7 @@
       
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
       <rosparam file="$(find object_detect)/config/balls/Yellow.yaml" />
-      <param name="uav_name" value="$(arg uav_name)" />
+      <param name="mask_filename" value="" />
 
       <param name="ocl_lut_kernel_file" value="$(find object_detect)/src/ocl_lut_kernel.cl" />
 
