@@ -45,6 +45,7 @@
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/DynamicReconfigureMgr.h>
 #include <mrs_lib/Profiler.h>
+#include <mrs_lib/geometry_utils.h>
 
 // Includes from this package
 #include <object_detect/BallDetections.h>
@@ -153,10 +154,10 @@ namespace object_detect
       //
       // Checks whether a calculated distance is valid
       bool distance_valid(float distance);
-      // Estimates distance of an object based on the 3D vectors pointing to its edges and known distance between those edges
-      float estimate_distance_from_known_diameter(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float known_diameter);
+      // Estimates distance of an object based on the 3D vectors pointing to its center and one of its edges and known distance between the edges
+      float estimate_distance_from_known_diameter(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, float physical_diameter);
       // Estimates distance based on information from a depthmap, masked using the binary thresholded image, optionally marks used pixels in the debug image
-      float estimate_distance_from_depthmap(const cv::Point2f& area_center, const float area_radius, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img);
+      float estimate_distance_from_depthmap(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img);
       //}
 
   };
