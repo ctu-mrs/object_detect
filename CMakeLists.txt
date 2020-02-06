@@ -121,6 +121,16 @@ target_link_libraries(backproject_display
   ${OpenCV_LIBRARIES}
 )
 
+add_executable(cpicker src/cpicker/cpicker.cpp)
+add_dependencies(cpicker
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+)
+target_link_libraries(cpicker
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
 add_library(color_mapping src/color_mapping.cpp)
 target_link_libraries(color_mapping
   ${catkin_LIBRARIES}

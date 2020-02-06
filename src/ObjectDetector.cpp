@@ -113,6 +113,7 @@ namespace object_detect
         /* Calculate 3D vector pointing to left and right edges of the detected object //{ */
         const Eigen::Vector3f l_vec = project(center.x - px_radius*cos(M_PI_4), center.y - px_radius*sin(M_PI_4), m_rgb_camera_model);
         const Eigen::Vector3f r_vec = project(center.x + px_radius*cos(M_PI_4), center.y + px_radius*sin(M_PI_4), m_rgb_camera_model);
+        const Eigen::Vector3f c_vec = (l_vec + r_vec) / 2.0f;
         //}
         
         /* Estimate distance based on known size of object if applicable //{ */
@@ -120,7 +121,7 @@ namespace object_detect
         bool estimated_distance_valid = false;
         if (physical_dimension_known)
         {
-          estimated_distance = estimate_distance_from_known_diameter(l_vec, r_vec, m_drmgr_ptr->config.ball__physical_diameter);
+          estimated_distance = estimate_distance_from_known_diameter(c_vec, l_vec, m_drmgr_ptr->config.ball__physical_diameter);
           /* cout << "Estimated distance: " << estimated_distance << endl; */
           estimated_distance_valid = distance_valid(estimated_distance);
         }
@@ -131,7 +132,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, px_radius, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(c_vec, l_vec, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           /* cout << "Depthmap distance: " << depthmap_distance << endl; */
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -175,7 +176,7 @@ namespace object_detect
         if (resulting_distance_quality > dist_qual_t::no_estimate)
         {
           /* Calculate the estimated position of the object //{ */
-          const Eigen::Vector3f pos_vec = resulting_distance * ((l_vec + r_vec) / 2.0).normalized();
+          const Eigen::Vector3f pos_vec = resulting_distance * c_vec.normalized();
           /* cout << "Estimated location (camera CS): [" << pos_vec(0) << ", " << pos_vec(1) << ", " << pos_vec(2) << "]" << std::endl; */
           ball.position = pos_vec;
           /* cout << "Estimated location (camera CS): [" << ball.position(0) << ", " << ball.position(1) << ", " << ball.position(2) << "]" << std::endl; */
@@ -327,32 +328,16 @@ namespace object_detect
   {
     /* Calculates the corresponding covariance matrix of the estimated 3D position */
     Eigen::Matrix3d pos_cov = Eigen::Matrix3d::Identity();  // prepare the covariance matrix
-    const double tol = 1e-9;
     pos_cov(0, 0) = pos_cov(1, 1) = xy_covariance_coeff;
 
     pos_cov(2, 2) = position_sf(2) * sqrt(position_sf(2)) * z_covariance_coeff;
     if (pos_cov(2, 2) < 0.33 * z_covariance_coeff)
       pos_cov(2, 2) = 0.33 * z_covariance_coeff;
 
-    // Find the rotation matrix to rotate the covariance to point in the direction of the estimated position
+    /* // Find the rotation matrix to rotate the covariance to point in the direction of the estimated position */
     const Eigen::Vector3d a(0.0, 0.0, 1.0);
     const Eigen::Vector3d b = position_sf.normalized();
-    const Eigen::Vector3d v = a.cross(b);
-    const double sin_ab = v.norm();
-    const double cos_ab = a.dot(b);
-    Eigen::Matrix3d vec_rot = Eigen::Matrix3d::Identity();
-    if (sin_ab < tol)  // unprobable, but possible - then it is identity or 180deg
-    {
-      if (cos_ab + 1.0 < tol)  // that would be 180deg
-      {
-        vec_rot << -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0;
-      }     // otherwise its identity
-    } else  // otherwise just construct the matrix
-    {
-      Eigen::Matrix3d v_x;
-      v_x << 0.0, -v(2), v(1), v(2), 0.0, -v(0), -v(1), v(0), 0.0;
-      vec_rot = Eigen::Matrix3d::Identity() + v_x + (1 - cos_ab) / (sin_ab * sin_ab) * (v_x * v_x);
-    }
+    const auto vec_rot = mrs_lib::rotation_between(a, b);
     pos_cov = rotate_covariance(pos_cov, vec_rot);  // rotate the covariance to point in direction of est. position
     return pos_cov;
   }
@@ -373,23 +358,27 @@ namespace object_detect
   //}
 
   /* estimate_distance_from_known_diameter() method //{ */
-  float ObjectDetector::estimate_distance_from_known_diameter(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float physical_diameter)
+  float ObjectDetector::estimate_distance_from_known_diameter(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, float physical_diameter)
   {
-    const Eigen::Vector3f c_vec = (l_vec + r_vec) / 2.0f;
-    const float dot = c_vec.dot(l_vec)/(c_vec.norm() * l_vec.norm());
+    const float dot = c_vec.dot(b_vec)/(c_vec.norm() * b_vec.norm());
     const float dist = physical_diameter/std::sqrt(1.0f - dot*dot)/2.0f;
     return dist;
   }
   //}
 
   /* estimate_distance_from_depthmap() method //{ */
-  float ObjectDetector::estimate_distance_from_depthmap(const cv::Point2f& area_center, const float area_radius, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img)
+  float ObjectDetector::estimate_distance_from_depthmap(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img)
   {
     bool publish_debug = dbg_img.needed();
     cv::Mat dbg_mat;
     if (publish_debug)
       dbg_mat = dbg_img.getMat();
   
+    // recalculate the area to coordinates in the depthmap
+    const cv::Point2f area_center = m_rgb_camera_model.project3dToPixel({c_vec.x(), c_vec.y(), c_vec.z()});
+    const cv::Point2f area_border = m_rgb_camera_model.project3dToPixel({b_vec.x(), b_vec.y(), b_vec.z()});
+    const float area_radius = cv::norm(area_border - area_center);
+
     const cv::Rect roi = circle_roi_clamped(area_center, area_radius, dm_img.size());
     const cv::Mat tmp_mask = circle_mask(area_center, area_radius, roi);
     const cv::Mat tmp_dm_img = dm_img(roi);
