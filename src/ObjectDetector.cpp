@@ -64,8 +64,9 @@ namespace object_detect
         if (publish_debug_dm)
         {
           cv::Mat im_8UC1;
-          const double min = 0;
-          const double max = 40000;
+          double min = 0;
+          double max = 40000;
+          cv::minMaxIdx(dm_img, &min, &max);
           dm_img.convertTo(im_8UC1, CV_8UC1, 255.0 / (max-min), -min * 255.0 / (max-min)); 
           cv::cvtColor(im_8UC1, dbg_img, cv::COLOR_GRAY2BGR);
           /* applyColorMap(im_8UC1, dbg_img, cv::COLORMAP_JET); */
@@ -89,7 +90,24 @@ namespace object_detect
       }
       if (publish_debug)
       {
-        highlight_mask(dbg_img, label_img, cv::Scalar(128, 0, 0));
+        cv::Mat label_img_res = label_img;
+        if (publish_debug_dm)
+        {
+          label_img_res = cv::Mat(dbg_img.size(), CV_8UC1, cv::Scalar(0));
+          const double dbg_img_dx = m_dm_camera_model.getDeltaX(dbg_img.cols, 1.0);
+          const double dbg_img_dy = m_dm_camera_model.getDeltaY(dbg_img.rows, 1.0);
+
+          const double rgb_img_dx = m_rgb_camera_model.getDeltaX(label_img.cols, 1.0);
+          const double rgb_img_dy = m_rgb_camera_model.getDeltaY(label_img.rows, 1.0);
+
+          const cv::Size label_size(dbg_img.cols/dbg_img_dx*rgb_img_dx, dbg_img.rows/dbg_img_dy*rgb_img_dy);
+          const cv::Rect label_roi(cv::Point2d(dbg_img.cols/2.0 - label_size.width/2.0, dbg_img.rows/2.0 - label_size.height/2.0), label_size);
+          cv::Mat tmp;
+          cv::resize(label_img, tmp, label_size, 0, 0);
+          cv::Mat roid = label_img_res(label_roi);
+          tmp.copyTo(roid);
+        }
+        highlight_mask(dbg_img, label_img_res, cv::Scalar(128, 0, 0));
         if (!m_inv_mask.empty())
           highlight_mask(dbg_img, m_inv_mask, cv::Scalar(0, 0, 128));
       }
@@ -161,11 +179,20 @@ namespace object_detect
 
         if (publish_debug)
         {
+          cv::Point dbg_center = center;
+          float dbg_radius = px_radius;
+          if (publish_debug_dm)
+          {
+            cv::Point2f tmp_center = m_dm_camera_model.project3dToPixel({c_vec.x(), c_vec.y(), c_vec.z()});
+            const cv::Point2f area_border = m_dm_camera_model.project3dToPixel({l_vec.x(), l_vec.y(), l_vec.z()});
+            dbg_radius = cv::norm(area_border - tmp_center);
+            dbg_center = tmp_center;
+          }
           /* cv::circle(dbg_img, center, radius, color_highlight(2*blob.color), 2); */
-          cv::circle(dbg_img, center, px_radius, cv::Scalar(0, 0, 255), 2);
-          cv::putText(dbg_img, std::to_string(resulting_distance_quality), center+cv::Point(px_radius, px_radius), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", center+cv::Point(px_radius, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", center+cv::Point(px_radius, -px_radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::circle(dbg_img, dbg_center, dbg_radius, cv::Scalar(0, 0, 255), 2);
+          cv::putText(dbg_img, std::to_string(resulting_distance_quality), dbg_center+cv::Point(dbg_radius, dbg_radius), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", dbg_center+cv::Point(dbg_radius, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", dbg_center+cv::Point(dbg_radius, -dbg_radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
         }
 
         /* cout << "Estimated distance used: " << physical_dimension_known */
@@ -375,8 +402,8 @@ namespace object_detect
       dbg_mat = dbg_img.getMat();
   
     // recalculate the area to coordinates in the depthmap
-    const cv::Point2f area_center = m_rgb_camera_model.project3dToPixel({c_vec.x(), c_vec.y(), c_vec.z()});
-    const cv::Point2f area_border = m_rgb_camera_model.project3dToPixel({b_vec.x(), b_vec.y(), b_vec.z()});
+    const cv::Point2f area_center = m_dm_camera_model.project3dToPixel({c_vec.x(), c_vec.y(), c_vec.z()});
+    const cv::Point2f area_border = m_dm_camera_model.project3dToPixel({b_vec.x(), b_vec.y(), b_vec.z()});
     const float area_radius = cv::norm(area_border - area_center);
 
     const cv::Rect roi = circle_roi_clamped(area_center, area_radius, dm_img.size());
