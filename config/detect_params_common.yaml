@@ -38,7 +38,7 @@ min_area: 40.0
 min_circularity: 0.2
 min_convexity: 0.3
 min_dist_between: 10.0
-min_inertia_ratio: 0.6
+min_inertia_ratio: 0.4
 min_repeatability: 1
 threshold_step: 255.0
 detector: 0
