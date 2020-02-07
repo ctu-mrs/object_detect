@@ -623,13 +623,14 @@ namespace object_detect
   std::optional<object_detect::lut_t> ObjectDetector::regenerate_lut(const BallConfig& ball_config)
   {
     const auto lut_start_time = ros::WallTime::now();
-    ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
+    ROS_INFO("[%s]: Generating lookup table ------------------------------------------------------------v", m_node_name.c_str());
     const auto lut_opt = generate_lut(ball_config);
     if (lut_opt.has_value())
     {
       const auto lut_end_time = ros::WallTime::now();
       const auto lut_dur = lut_end_time - lut_start_time;
-      ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
+      ROS_INFO("[%s]: Lookup table generated in %fs ----------------------------------------------------^", m_node_name.c_str(), lut_dur.toSec());
+
     }
     return lut_opt;
   }

@@ -242,7 +242,7 @@ namespace object_detect
                 const auto cur_h = color_hsv[0];
                 const auto cur_s = color_hsv[1];
                 const auto cur_v = color_hsv[2];
-                const bool hs_ok = lookup_lut(hslut, cur_h, cur_s, 0, 180, 256);
+                const bool hs_ok = hslut.lut.at(cur_h + cur_s*180);
                 const bool v_ok = cur_v > val_lower && cur_v < val_higher;
                 if (hs_ok && v_ok)
                   lut.at(r + lut_dim*g + lut_dim*lut_dim*b) |= color_label;
@@ -288,7 +288,7 @@ namespace object_detect
           cfg.lutss,
           val_lower, val_higher,
           1, ret));
-}
+  }
 
   //}
 
@@ -324,7 +324,7 @@ namespace object_detect
                 const auto cur_l = color_lab[0];
                 const auto cur_a = color_lab[1];
                 const auto cur_b = color_lab[2];
-                const bool ab_ok = lookup_lut(ablut, cur_a, cur_b, 0);
+                const bool ab_ok = ablut.lut.at(cur_a + cur_b*256);
                 const bool l_ok = cur_l > l_lower && cur_l < l_higher;
                 if (ab_ok && l_ok)
                   lut.at(r + lut_dim*g + lut_dim*lut_dim*b) |= color_label;
@@ -436,20 +436,5 @@ namespace object_detect
   }
 
   //}
-
-/* lookup_lut() //{ */
-
-lut_elem_t lookup_lut(const lutss_t lutss, size_t x, size_t y, size_t z, size_t xdim, size_t ydim)
-{
-  assert(lutss.subsampling_x > 0);
-  assert(lutss.subsampling_y > 0);
-  assert(lutss.subsampling_z > 0);
-  const size_t x_offset = x/lutss.subsampling_x;
-  const size_t y_offset = xdim*y/lutss.subsampling_y;
-  const size_t z_offset = xdim*ydim*z/lutss.subsampling_z;
-  return lutss.lut.at(x_offset + y_offset + z_offset);
-}
-
-//}
 
 }
