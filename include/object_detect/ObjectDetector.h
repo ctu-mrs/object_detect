@@ -77,7 +77,7 @@ namespace object_detect
       using ros_cov_t = BallDetection::_pose_type::_covariance_type;
 
     public:
-      ObjectDetector() : m_node_name("ObjectDetector") {};
+      ObjectDetector() : m_node_name("ObjectDetector"), m_dm_camera_model_valid(false), m_rgb_camera_model_valid(false) {};
       virtual void onInit();
       bool cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp);
       std::optional<object_detect::lut_t> regenerate_lut(const BallConfig& ball_config);
@@ -139,7 +139,9 @@ namespace object_detect
       BlobDetector m_blob_det;
       int m_prev_color_id;
       std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
+      bool m_dm_camera_model_valid;
       image_geometry::PinholeCameraModel m_dm_camera_model;
+      bool m_rgb_camera_model_valid;
       image_geometry::PinholeCameraModel m_rgb_camera_model;
 
       cv::Mat m_inv_mask;

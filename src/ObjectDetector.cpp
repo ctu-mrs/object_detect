@@ -13,10 +13,22 @@ namespace object_detect
   void ObjectDetector::main_loop([[maybe_unused]] const ros::TimerEvent& evt)
   {
     /* Initialize the camera models //{ */
-    if (m_sh_dm_cinfo->has_data() && !m_sh_dm_cinfo->used_data())
+    if (m_sh_dm_cinfo->has_data() && !m_dm_camera_model_valid)
+    {
       m_dm_camera_model.fromCameraInfo(m_sh_dm_cinfo->get_data());
-    if (m_sh_rgb_cinfo->has_data() && !m_sh_rgb_cinfo->used_data())
+      if (m_dm_camera_model.fx() == 0.0 || m_dm_camera_model.fy() == 0.0)
+        ROS_ERROR_THROTTLE(1.0, "[ObjectDetector]: Depthmap camera model is invalid (fx or fy is zero)!");
+      else
+        m_dm_camera_model_valid = true;
+    }
+    if (m_sh_rgb_cinfo->has_data() && !m_rgb_camera_model_valid)
+    {
       m_rgb_camera_model.fromCameraInfo(m_sh_rgb_cinfo->get_data());
+      if (m_rgb_camera_model.fx() == 0.0 || m_rgb_camera_model.fy() == 0.0)
+        ROS_ERROR_THROTTLE(1.0, "[ObjectDetector]: Color camera model is invalid (fx or fy is zero)!");
+      else
+        m_rgb_camera_model_valid = true;
+    }
     //}
 
     /* load covariance coefficients from dynparam //{ */
@@ -34,8 +46,8 @@ namespace object_detect
     
     //}
 
-    const bool rgb_ready = m_sh_rgb->new_data() && m_sh_rgb_cinfo->used_data();
-    const bool dm_ready = m_sh_dm->new_data() && m_sh_dm_cinfo->used_data();
+    const bool rgb_ready = m_sh_rgb->new_data() && m_rgb_camera_model_valid;
+    const bool dm_ready = m_sh_dm->new_data() && m_dm_camera_model_valid;
 
     // Check if we got all required messages
     if (rgb_ready)
