@@ -558,6 +558,7 @@ namespace object_detect
   
     image_transport::ImageTransport it(m_nh);
     m_pub_debug = it.advertise("debug_image", 1);
+    m_pub_lut = it.advertise("lut", 1, true);
     m_pub_pcl = m_nh.advertise<sensor_msgs::PointCloud2>("detected_balls_pcl", 10);
     m_pub_det = m_nh.advertise<object_detect::BallDetections>("detected_balls", 10);
     //}
@@ -643,6 +644,16 @@ namespace object_detect
       const auto lut_dur = lut_end_time - lut_start_time;
       ROS_INFO("[%s]: Lookup table generated in %fs ----------------------------------------------------^", m_node_name.c_str(), lut_dur.toSec());
 
+      if ((ball_config.params.binarization_method == bin_method_t::hs_lut || ball_config.params.binarization_method == bin_method_t::ab_lut) && m_pub_lut.getNumSubscribers() > 0)
+      {
+        cv::Mat lut(ball_config.lutss.lut);
+        lut = 255*lut.reshape(1, 256).t();
+
+        cv_bridge::CvImage dbg_img_ros({}, sensor_msgs::image_encodings::MONO8, lut);
+        sensor_msgs::ImagePtr dbg_img_msg;
+        dbg_img_msg = dbg_img_ros.toImageMsg();
+        m_pub_lut.publish(dbg_img_msg);
+      }
     }
     return lut_opt;
   }

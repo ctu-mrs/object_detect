@@ -121,6 +121,7 @@ namespace object_detect
       ros::Publisher m_pub_det;
       ros::Publisher m_pub_pcl;
       image_transport::Publisher m_pub_debug;
+      image_transport::Publisher m_pub_lut;
 
       ros::ServiceServer m_srv_regenerate_lut;
 
