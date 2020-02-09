@@ -35,8 +35,8 @@ max_circularity: 1.0
 max_convexity: 1.0
 max_inertia_ratio: 1.0
 min_area: 40.0
-min_circularity: 0.2
-min_convexity: 0.3
+min_circularity: 0.6
+min_convexity: 0.5
 min_dist_between: 10.0
 min_inertia_ratio: 0.4
 min_repeatability: 1
