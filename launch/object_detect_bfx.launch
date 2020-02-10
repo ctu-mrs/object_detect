@@ -1,6 +1,7 @@
 <launch>
 
   <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+  <arg name="respawn" default="false" />
 
   <arg name="debug" default="false" />
   <arg unless="$(arg debug)" name="launch_prefix_debug" value=""/>
@@ -11,6 +12,8 @@
 
   <arg name="color_image" value="bluefox3_front/image_raw"/>
   <arg name="color_cinfo" value="bluefox3_front/camera_info"/>
+  <arg name="depthmap_image" value="bluefox3_front/depth/image_rect_raw"/>
+  <arg name="depthmap_cinfo" value="bluefox3_front/depth/camera_info"/>
 
   <arg name="standalone" default="true" />
   <arg name="manager" default="object_detect_nodelet_manager" />
@@ -20,14 +23,16 @@
 
   <group ns="$(arg uav_name)">
 
-    <node pkg="nodelet" type="nodelet" name="object_detect_bfx" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" >
+    <node pkg="nodelet" type="nodelet" name="object_detect_bfx" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" respawn="$(arg respawn)" >
       
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
-      <rosparam file="$(find object_detect)/config/balls/RedBfx.yaml" />
+      <rosparam file="$(find object_detect)/config/balls/YellowBfx.yaml" />
       <param name="mask_filename" value="$(find object_detect)/mask/bluefox3_front.bmp" />
 
       <param name="ocl_lut_kernel_file" value="$(find object_detect)/src/ocl_lut_kernel.cl" />
 
+      <remap from="~dm_image" to="$(arg depthmap_image)" />
+      <remap from="~dm_camera_info" to="$(arg depthmap_cinfo)" />
       <remap from="~rgb_image" to="$(arg color_image)" />
       <remap from="~rgb_camera_info" to="$(arg color_cinfo)" />
 

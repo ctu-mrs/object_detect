@@ -45,6 +45,7 @@
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/DynamicReconfigureMgr.h>
 #include <mrs_lib/Profiler.h>
+#include <mrs_lib/geometry_utils.h>
 
 // Includes from this package
 #include <object_detect/BallDetections.h>
@@ -76,7 +77,7 @@ namespace object_detect
       using ros_cov_t = BallDetection::_pose_type::_covariance_type;
 
     public:
-      ObjectDetector() : m_node_name("ObjectDetector") {};
+      ObjectDetector() : m_node_name("ObjectDetector"), m_dm_camera_model_valid(false), m_rgb_camera_model_valid(false) {};
       virtual void onInit();
       bool cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp);
       std::optional<object_detect::lut_t> regenerate_lut(const BallConfig& ball_config);
@@ -120,6 +121,7 @@ namespace object_detect
       ros::Publisher m_pub_det;
       ros::Publisher m_pub_pcl;
       image_transport::Publisher m_pub_debug;
+      image_transport::Publisher m_pub_lut;
 
       ros::ServiceServer m_srv_regenerate_lut;
 
@@ -138,7 +140,9 @@ namespace object_detect
       BlobDetector m_blob_det;
       int m_prev_color_id;
       std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
+      bool m_dm_camera_model_valid;
       image_geometry::PinholeCameraModel m_dm_camera_model;
+      bool m_rgb_camera_model_valid;
       image_geometry::PinholeCameraModel m_rgb_camera_model;
 
       cv::Mat m_inv_mask;
@@ -153,10 +157,10 @@ namespace object_detect
       //
       // Checks whether a calculated distance is valid
       bool distance_valid(float distance);
-      // Estimates distance of an object based on the 3D vectors pointing to its edges and known distance between those edges
-      float estimate_distance_from_known_diameter(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float known_diameter);
+      // Estimates distance of an object based on the 3D vectors pointing to its center and one of its edges and known distance between the edges
+      float estimate_distance_from_known_diameter(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, float physical_diameter);
       // Estimates distance based on information from a depthmap, masked using the binary thresholded image, optionally marks used pixels in the debug image
-      float estimate_distance_from_depthmap(const cv::Point2f& area_center, const float area_radius, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img);
+      float estimate_distance_from_depthmap(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img);
       //}
 
   };

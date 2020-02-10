@@ -13,10 +13,22 @@ namespace object_detect
   void ObjectDetector::main_loop([[maybe_unused]] const ros::TimerEvent& evt)
   {
     /* Initialize the camera models //{ */
-    if (m_sh_dm_cinfo->has_data() && !m_sh_dm_cinfo->used_data())
+    if (m_sh_dm_cinfo->has_data() && !m_dm_camera_model_valid)
+    {
       m_dm_camera_model.fromCameraInfo(m_sh_dm_cinfo->get_data());
-    if (m_sh_rgb_cinfo->has_data() && !m_sh_rgb_cinfo->used_data())
+      if (m_dm_camera_model.fx() == 0.0 || m_dm_camera_model.fy() == 0.0)
+        ROS_ERROR_THROTTLE(1.0, "[ObjectDetector]: Depthmap camera model is invalid (fx or fy is zero)!");
+      else
+        m_dm_camera_model_valid = true;
+    }
+    if (m_sh_rgb_cinfo->has_data() && !m_rgb_camera_model_valid)
+    {
       m_rgb_camera_model.fromCameraInfo(m_sh_rgb_cinfo->get_data());
+      if (m_rgb_camera_model.fx() == 0.0 || m_rgb_camera_model.fy() == 0.0)
+        ROS_ERROR_THROTTLE(1.0, "[ObjectDetector]: Color camera model is invalid (fx or fy is zero)!");
+      else
+        m_rgb_camera_model_valid = true;
+    }
     //}
 
     /* load covariance coefficients from dynparam //{ */
@@ -34,8 +46,8 @@ namespace object_detect
     
     //}
 
-    const bool rgb_ready = m_sh_rgb->new_data() && m_sh_rgb_cinfo->used_data();
-    const bool dm_ready = m_sh_dm->new_data() && m_sh_dm_cinfo->used_data();
+    const bool rgb_ready = m_sh_rgb->new_data() && m_rgb_camera_model_valid;
+    const bool dm_ready = m_sh_dm->new_data() && m_dm_camera_model_valid;
 
     // Check if we got all required messages
     if (rgb_ready)
@@ -64,8 +76,9 @@ namespace object_detect
         if (publish_debug_dm)
         {
           cv::Mat im_8UC1;
-          const double min = 0;
-          const double max = 40000;
+          double min = 0;
+          double max = 40000;
+          cv::minMaxIdx(dm_img, &min, &max);
           dm_img.convertTo(im_8UC1, CV_8UC1, 255.0 / (max-min), -min * 255.0 / (max-min)); 
           cv::cvtColor(im_8UC1, dbg_img, cv::COLOR_GRAY2BGR);
           /* applyColorMap(im_8UC1, dbg_img, cv::COLORMAP_JET); */
@@ -89,7 +102,24 @@ namespace object_detect
       }
       if (publish_debug)
       {
-        highlight_mask(dbg_img, label_img, cv::Scalar(128, 0, 0));
+        cv::Mat label_img_res = label_img;
+        if (publish_debug_dm)
+        {
+          label_img_res = cv::Mat(dbg_img.size(), CV_8UC1, cv::Scalar(0));
+          const double dbg_img_dx = m_dm_camera_model.getDeltaX(dbg_img.cols, 1.0);
+          const double dbg_img_dy = m_dm_camera_model.getDeltaY(dbg_img.rows, 1.0);
+
+          const double rgb_img_dx = m_rgb_camera_model.getDeltaX(label_img.cols, 1.0);
+          const double rgb_img_dy = m_rgb_camera_model.getDeltaY(label_img.rows, 1.0);
+
+          const cv::Size label_size(dbg_img.cols/dbg_img_dx*rgb_img_dx, dbg_img.rows/dbg_img_dy*rgb_img_dy);
+          const cv::Rect label_roi(cv::Point2d(dbg_img.cols/2.0 - label_size.width/2.0, dbg_img.rows/2.0 - label_size.height/2.0), label_size);
+          cv::Mat tmp;
+          cv::resize(label_img, tmp, label_size, 0, 0);
+          cv::Mat roid = label_img_res(label_roi);
+          tmp.copyTo(roid);
+        }
+        highlight_mask(dbg_img, label_img_res, cv::Scalar(128, 0, 0));
         if (!m_inv_mask.empty())
           highlight_mask(dbg_img, m_inv_mask, cv::Scalar(0, 0, 128));
       }
@@ -113,6 +143,7 @@ namespace object_detect
         /* Calculate 3D vector pointing to left and right edges of the detected object //{ */
         const Eigen::Vector3f l_vec = project(center.x - px_radius*cos(M_PI_4), center.y - px_radius*sin(M_PI_4), m_rgb_camera_model);
         const Eigen::Vector3f r_vec = project(center.x + px_radius*cos(M_PI_4), center.y + px_radius*sin(M_PI_4), m_rgb_camera_model);
+        const Eigen::Vector3f c_vec = (l_vec + r_vec) / 2.0f;
         //}
         
         /* Estimate distance based on known size of object if applicable //{ */
@@ -120,7 +151,7 @@ namespace object_detect
         bool estimated_distance_valid = false;
         if (physical_dimension_known)
         {
-          estimated_distance = estimate_distance_from_known_diameter(l_vec, r_vec, m_drmgr_ptr->config.ball__physical_diameter);
+          estimated_distance = estimate_distance_from_known_diameter(c_vec, l_vec, m_drmgr_ptr->config.ball__physical_diameter);
           /* cout << "Estimated distance: " << estimated_distance << endl; */
           estimated_distance_valid = distance_valid(estimated_distance);
         }
@@ -131,7 +162,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(center, px_radius, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(c_vec, l_vec, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           /* cout << "Depthmap distance: " << depthmap_distance << endl; */
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -160,11 +191,20 @@ namespace object_detect
 
         if (publish_debug)
         {
+          cv::Point dbg_center = center;
+          float dbg_radius = px_radius;
+          if (publish_debug_dm)
+          {
+            cv::Point2f tmp_center = m_dm_camera_model.project3dToPixel({c_vec.x(), c_vec.y(), c_vec.z()});
+            const cv::Point2f area_border = m_dm_camera_model.project3dToPixel({l_vec.x(), l_vec.y(), l_vec.z()});
+            dbg_radius = cv::norm(area_border - tmp_center);
+            dbg_center = tmp_center;
+          }
           /* cv::circle(dbg_img, center, radius, color_highlight(2*blob.color), 2); */
-          cv::circle(dbg_img, center, px_radius, cv::Scalar(0, 0, 255), 2);
-          cv::putText(dbg_img, std::to_string(resulting_distance_quality), center+cv::Point(px_radius, px_radius), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", center+cv::Point(px_radius, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", center+cv::Point(px_radius, -px_radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::circle(dbg_img, dbg_center, dbg_radius, cv::Scalar(0, 0, 255), 2);
+          cv::putText(dbg_img, std::to_string(resulting_distance_quality), dbg_center+cv::Point(dbg_radius, dbg_radius), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", dbg_center+cv::Point(dbg_radius, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", dbg_center+cv::Point(dbg_radius, -dbg_radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
         }
 
         /* cout << "Estimated distance used: " << physical_dimension_known */
@@ -175,7 +215,7 @@ namespace object_detect
         if (resulting_distance_quality > dist_qual_t::no_estimate)
         {
           /* Calculate the estimated position of the object //{ */
-          const Eigen::Vector3f pos_vec = resulting_distance * ((l_vec + r_vec) / 2.0).normalized();
+          const Eigen::Vector3f pos_vec = resulting_distance * c_vec.normalized();
           /* cout << "Estimated location (camera CS): [" << pos_vec(0) << ", " << pos_vec(1) << ", " << pos_vec(2) << "]" << std::endl; */
           ball.position = pos_vec;
           /* cout << "Estimated location (camera CS): [" << ball.position(0) << ", " << ball.position(1) << ", " << ball.position(2) << "]" << std::endl; */
@@ -327,32 +367,16 @@ namespace object_detect
   {
     /* Calculates the corresponding covariance matrix of the estimated 3D position */
     Eigen::Matrix3d pos_cov = Eigen::Matrix3d::Identity();  // prepare the covariance matrix
-    const double tol = 1e-9;
     pos_cov(0, 0) = pos_cov(1, 1) = xy_covariance_coeff;
 
     pos_cov(2, 2) = position_sf(2) * sqrt(position_sf(2)) * z_covariance_coeff;
     if (pos_cov(2, 2) < 0.33 * z_covariance_coeff)
       pos_cov(2, 2) = 0.33 * z_covariance_coeff;
 
-    // Find the rotation matrix to rotate the covariance to point in the direction of the estimated position
+    /* // Find the rotation matrix to rotate the covariance to point in the direction of the estimated position */
     const Eigen::Vector3d a(0.0, 0.0, 1.0);
     const Eigen::Vector3d b = position_sf.normalized();
-    const Eigen::Vector3d v = a.cross(b);
-    const double sin_ab = v.norm();
-    const double cos_ab = a.dot(b);
-    Eigen::Matrix3d vec_rot = Eigen::Matrix3d::Identity();
-    if (sin_ab < tol)  // unprobable, but possible - then it is identity or 180deg
-    {
-      if (cos_ab + 1.0 < tol)  // that would be 180deg
-      {
-        vec_rot << -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0;
-      }     // otherwise its identity
-    } else  // otherwise just construct the matrix
-    {
-      Eigen::Matrix3d v_x;
-      v_x << 0.0, -v(2), v(1), v(2), 0.0, -v(0), -v(1), v(0), 0.0;
-      vec_rot = Eigen::Matrix3d::Identity() + v_x + (1 - cos_ab) / (sin_ab * sin_ab) * (v_x * v_x);
-    }
+    const auto vec_rot = mrs_lib::rotation_between(a, b);
     pos_cov = rotate_covariance(pos_cov, vec_rot);  // rotate the covariance to point in direction of est. position
     return pos_cov;
   }
@@ -373,23 +397,27 @@ namespace object_detect
   //}
 
   /* estimate_distance_from_known_diameter() method //{ */
-  float ObjectDetector::estimate_distance_from_known_diameter(const Eigen::Vector3f& l_vec, const Eigen::Vector3f& r_vec, float physical_diameter)
+  float ObjectDetector::estimate_distance_from_known_diameter(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, float physical_diameter)
   {
-    const Eigen::Vector3f c_vec = (l_vec + r_vec) / 2.0f;
-    const float dot = c_vec.dot(l_vec)/(c_vec.norm() * l_vec.norm());
+    const float dot = c_vec.dot(b_vec)/(c_vec.norm() * b_vec.norm());
     const float dist = physical_diameter/std::sqrt(1.0f - dot*dot)/2.0f;
     return dist;
   }
   //}
 
   /* estimate_distance_from_depthmap() method //{ */
-  float ObjectDetector::estimate_distance_from_depthmap(const cv::Point2f& area_center, const float area_radius, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img)
+  float ObjectDetector::estimate_distance_from_depthmap(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img)
   {
     bool publish_debug = dbg_img.needed();
     cv::Mat dbg_mat;
     if (publish_debug)
       dbg_mat = dbg_img.getMat();
   
+    // recalculate the area to coordinates in the depthmap
+    const cv::Point2f area_center = m_dm_camera_model.project3dToPixel({c_vec.x(), c_vec.y(), c_vec.z()});
+    const cv::Point2f area_border = m_dm_camera_model.project3dToPixel({b_vec.x(), b_vec.y(), b_vec.z()});
+    const float area_radius = cv::norm(area_border - area_center);
+
     const cv::Rect roi = circle_roi_clamped(area_center, area_radius, dm_img.size());
     const cv::Mat tmp_mask = circle_mask(area_center, area_radius, roi);
     const cv::Mat tmp_dm_img = dm_img(roi);
@@ -530,6 +558,7 @@ namespace object_detect
   
     image_transport::ImageTransport it(m_nh);
     m_pub_debug = it.advertise("debug_image", 1);
+    m_pub_lut = it.advertise("lut", 1, true);
     m_pub_pcl = m_nh.advertise<sensor_msgs::PointCloud2>("detected_balls_pcl", 10);
     m_pub_det = m_nh.advertise<object_detect::BallDetections>("detected_balls", 10);
     //}
@@ -607,13 +636,24 @@ namespace object_detect
   std::optional<object_detect::lut_t> ObjectDetector::regenerate_lut(const BallConfig& ball_config)
   {
     const auto lut_start_time = ros::WallTime::now();
-    ROS_INFO("[%s]: Generating lookup table", m_node_name.c_str());
+    ROS_INFO("[%s]: Generating lookup table ------------------------------------------------------------v", m_node_name.c_str());
     const auto lut_opt = generate_lut(ball_config);
     if (lut_opt.has_value())
     {
       const auto lut_end_time = ros::WallTime::now();
       const auto lut_dur = lut_end_time - lut_start_time;
-      ROS_INFO("[%s]: Lookup table generated in %fs", m_node_name.c_str(), lut_dur.toSec());
+      ROS_INFO("[%s]: Lookup table generated in %fs ----------------------------------------------------^", m_node_name.c_str(), lut_dur.toSec());
+
+      if ((ball_config.params.binarization_method == bin_method_t::hs_lut || ball_config.params.binarization_method == bin_method_t::ab_lut) && m_pub_lut.getNumSubscribers() > 0)
+      {
+        cv::Mat lut(ball_config.lutss.lut);
+        lut = 255*lut.reshape(1, 256).t();
+
+        cv_bridge::CvImage dbg_img_ros({}, sensor_msgs::image_encodings::MONO8, lut);
+        sensor_msgs::ImagePtr dbg_img_msg;
+        dbg_img_msg = dbg_img_ros.toImageMsg();
+        m_pub_lut.publish(dbg_img_msg);
+      }
     }
     return lut_opt;
   }
