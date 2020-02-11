@@ -24,8 +24,8 @@
 
     <node pkg="nodelet" type="nodelet" name="object_detect" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" >
       
-      <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
-      <rosparam file="$(find object_detect)/config/balls/GreenSim.yaml" />
+      <rosparam file="$(find object_detect)/config/detect_params_balloons.yaml" />
+      <rosparam file="$(find object_detect)/config/balls/Green.yaml" />
       <param name="uav_name" value="$(arg uav_name)" />
 
       <param name="ocl_lut_kernel_file" value="$(find object_detect)/src/ocl_lut_kernel.cl" />
