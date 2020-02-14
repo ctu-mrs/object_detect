@@ -1,8 +1,8 @@
 ball:
-  binarization_method_name: LAB
-  hsv: {hue_center: 91.64990818633436, hue_range: 13.513081120684063, sat_center: 149.3968731668392,
-    sat_range: 139.40907994631135, val_center: 66.0839293262595, val_range: 1325.7386740289828}
-  lab: {a_center: 117.38950752674258, a_range: 12.992936087354279, b_center: 122.37758249223603,
-    b_range: 17.010364439797137, l_center: 59.4377657004831, l_range: 1168.5113255526085}
+  binarization_method_name: HSV
+  hsv: {hue_center: 84.35097384925632, hue_range: 34.433411114639874, sat_center: 131.46069182389937,
+    sat_range: 146.650290388894, val_center: 31.732595182595183, val_range: 731.2846015049165}
+  lab: {a_center: 120.5169246895662, a_range: 9.908407056260566, b_center: 128.07636891410476,
+    b_range: 21.785476274651124, l_center: 27.149670874199174, l_range: 810.8154089452228}
   physical_diameter: 0.55
-  segment_color_name: green
+  segment_color_name: greenday
