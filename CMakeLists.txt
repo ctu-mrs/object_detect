@@ -18,7 +18,6 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   mrs_msgs
   mrs_lib
-  mrs_uav_manager
   tf2
   tf2_ros
   tf2_msgs
@@ -111,28 +110,28 @@ target_link_libraries(ObjectDetector
   ${OpenCV_LIBRARIES}
 )
 
-add_executable(backproject_display src/backproject_display.cpp)
-add_dependencies(backproject_display
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-)
-target_link_libraries(backproject_display
-  ${catkin_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-)
+# add_executable(backproject_display src/backproject_display.cpp)
+# add_dependencies(backproject_display
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+#   ${catkin_EXPORTED_TARGETS}
+# )
+# target_link_libraries(backproject_display
+#   ${catkin_LIBRARIES}
+#   ${OpenCV_LIBRARIES}
+# )
 
-add_executable(cpicker src/cpicker/cpicker.cpp)
-add_dependencies(cpicker
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-)
-target_link_libraries(cpicker
-  ${catkin_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-)
+# add_executable(cpicker src/cpicker/cpicker.cpp)
+# add_dependencies(cpicker
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+#   ${catkin_EXPORTED_TARGETS}
+# )
+# target_link_libraries(cpicker
+#   ${catkin_LIBRARIES}
+#   ${OpenCV_LIBRARIES}
+# )
 
-add_library(color_mapping src/color_mapping.cpp)
-target_link_libraries(color_mapping
-  ${catkin_LIBRARIES}
-  ${Eigen_LIBRARIES}
-  )
+# add_library(color_mapping src/color_mapping.cpp)
+# target_link_libraries(color_mapping
+#   ${catkin_LIBRARIES}
+#   ${Eigen_LIBRARIES}
+#   )

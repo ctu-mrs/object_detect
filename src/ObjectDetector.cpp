@@ -13,17 +13,17 @@ namespace object_detect
   void ObjectDetector::main_loop([[maybe_unused]] const ros::TimerEvent& evt)
   {
     /* Initialize the camera models //{ */
-    if (m_sh_dm_cinfo->has_data() && !m_dm_camera_model_valid)
+    if (m_sh_dm_cinfo.hasMsg() && !m_dm_camera_model_valid)
     {
-      m_dm_camera_model.fromCameraInfo(m_sh_dm_cinfo->get_data());
+      m_dm_camera_model.fromCameraInfo(m_sh_dm_cinfo.getMsg());
       if (m_dm_camera_model.fx() == 0.0 || m_dm_camera_model.fy() == 0.0)
         ROS_ERROR_THROTTLE(1.0, "[ObjectDetector]: Depthmap camera model is invalid (fx or fy is zero)!");
       else
         m_dm_camera_model_valid = true;
     }
-    if (m_sh_rgb_cinfo->has_data() && !m_rgb_camera_model_valid)
+    if (m_sh_rgb_cinfo.hasMsg() && !m_rgb_camera_model_valid)
     {
-      m_rgb_camera_model.fromCameraInfo(m_sh_rgb_cinfo->get_data());
+      m_rgb_camera_model.fromCameraInfo(m_sh_rgb_cinfo.getMsg());
       if (m_rgb_camera_model.fx() == 0.0 || m_rgb_camera_model.fy() == 0.0)
         ROS_ERROR_THROTTLE(1.0, "[ObjectDetector]: Color camera model is invalid (fx or fy is zero)!");
       else
@@ -46,8 +46,8 @@ namespace object_detect
     
     //}
 
-    const bool rgb_ready = m_sh_rgb->new_data() && m_rgb_camera_model_valid;
-    const bool dm_ready = m_sh_dm->new_data() && m_dm_camera_model_valid;
+    const bool rgb_ready = m_sh_rgb.newMsg() && m_rgb_camera_model_valid;
+    const bool dm_ready = m_sh_dm.newMsg() && m_dm_camera_model_valid;
 
     // Check if we got all required messages
     if (rgb_ready)
@@ -57,11 +57,11 @@ namespace object_detect
       cv::Mat dm_img;
       if (dm_ready)
       {
-        const sensor_msgs::ImageConstPtr dm_img_msg = m_sh_dm->get_data();
+        const sensor_msgs::ImageConstPtr dm_img_msg = m_sh_dm.getMsg();
         const cv_bridge::CvImageConstPtr dm_img_ros = cv_bridge::toCvShare(dm_img_msg, sensor_msgs::image_encodings::TYPE_16UC1);
         dm_img = dm_img_ros->image;
       }
-      const sensor_msgs::ImageConstPtr rgb_img_msg = m_sh_rgb->get_data();
+      const sensor_msgs::ImageConstPtr rgb_img_msg = m_sh_rgb.getMsg();
       const cv_bridge::CvImageConstPtr rgb_img_ros = cv_bridge::toCvShare(rgb_img_msg, sensor_msgs::image_encodings::BGR8);
       const cv::Mat rgb_img = rgb_img_ros->image;
       cv::Mat label_img;
@@ -522,18 +522,18 @@ namespace object_detect
     // LOAD STATIC PARAMETERS
     ROS_INFO("[%s]: Loading static parameters:", m_node_name.c_str());
     // Load the detection parameters
-    pl.load_param("max_dist", m_max_dist);
-    pl.load_param("max_dist_diff", m_max_dist_diff);
-    pl.load_param("min_depth", m_min_depth);
-    pl.load_param("max_depth", m_max_depth);
-    pl.load_param("mask_filename", m_mask_filename, ""s);
-    const std::string ocl_lut_kernel_file = pl.load_param2<std::string>("ocl_lut_kernel_file");
-    const bool use_ocl = pl.load_param2<bool>("use_ocl");
+    pl.loadParam("max_dist", m_max_dist);
+    pl.loadParam("max_dist_diff", m_max_dist_diff);
+    pl.loadParam("min_depth", m_min_depth);
+    pl.loadParam("max_depth", m_max_depth);
+    pl.loadParam("mask_filename", m_mask_filename, ""s);
+    const std::string ocl_lut_kernel_file = pl.loadParam2<std::string>("ocl_lut_kernel_file");
+    const bool use_ocl = pl.loadParam2<bool>("use_ocl");
 
     BallConfig ball_config = load_ball_config(pl);
     load_ball_to_dynrec(ball_config.params);
 
-    double loop_rate = pl.load_param2<double>("loop_rate", 100);
+    double loop_rate = pl.loadParam2<double>("loop_rate", 100);
 
     if (!m_drmgr_ptr->loaded_successfully())
     {
@@ -541,7 +541,7 @@ namespace object_detect
       ros::shutdown();
     }
 
-    if (!pl.loaded_successfully())
+    if (!pl.loadedSuccessfully())
     {
       ROS_ERROR("[%s]: Some compulsory parameters were not loaded successfully, ending the node", m_node_name.c_str());
       ros::shutdown();
@@ -550,11 +550,12 @@ namespace object_detect
     
     /** Create publishers and subscribers //{**/
     // Initialize other subs and pubs
-    SubscribeMgr smgr(m_nh);
-    m_sh_dm = smgr.create_handler<sensor_msgs::Image>("dm_image", ros::Duration(5.0));
-    m_sh_dm_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("dm_camera_info", ros::Duration(5.0));
-    m_sh_rgb = smgr.create_handler<sensor_msgs::Image>("rgb_image", ros::Duration(5.0));
-    m_sh_rgb_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("rgb_camera_info", ros::Duration(5.0));
+    mrs_lib::SubscribeHandlerOptions shopts;
+    shopts.no_message_timeout = ros::Duration(5.0);
+    mrs_lib::construct_object(m_sh_dm, shopts, "dm_image");
+    mrs_lib::construct_object(m_sh_dm_cinfo, shopts, "dm_camera_info");
+    mrs_lib::construct_object(m_sh_rgb, shopts, "rgb_image");
+    mrs_lib::construct_object(m_sh_rgb_cinfo, shopts, "rgb_camera_info");
   
     image_transport::ImageTransport it(m_nh);
     m_pub_debug = it.advertise("debug_image", 1);
@@ -697,33 +698,33 @@ namespace object_detect
     auto& ball_params = ball_config.params;
 
     ball_params.override_settings = false;
-    std::string bin_method_str = pl.load_param2<std::string>("ball/binarization_method_name");
+    std::string bin_method_str = pl.loadParam2<std::string>("ball/binarization_method_name");
     ball_params.binarization_method = binarization_method_id(bin_method_str);
 
-    pl.load_param("ball/segment_color_name", ball_params.ball__segment_color_name);
-    pl.load_param("ball/physical_diameter", ball_params.ball__physical_diameter);
+    pl.loadParam("ball/segment_color_name", ball_params.ball__segment_color_name);
+    pl.loadParam("ball/physical_diameter", ball_params.ball__physical_diameter);
   
-    pl.load_param("ball/lab/l_range", ball_params.ball__lab__l_range);
-    pl.load_param("ball/lab/a_range", ball_params.ball__lab__a_range);
-    pl.load_param("ball/lab/b_range", ball_params.ball__lab__b_range);
-    pl.load_param("ball/lab/l_center", ball_params.ball__lab__l_center);
-    pl.load_param("ball/lab/a_center", ball_params.ball__lab__a_center);
-    pl.load_param("ball/lab/b_center", ball_params.ball__lab__b_center);
+    pl.loadParam("ball/lab/l_range", ball_params.ball__lab__l_range);
+    pl.loadParam("ball/lab/a_range", ball_params.ball__lab__a_range);
+    pl.loadParam("ball/lab/b_range", ball_params.ball__lab__b_range);
+    pl.loadParam("ball/lab/l_center", ball_params.ball__lab__l_center);
+    pl.loadParam("ball/lab/a_center", ball_params.ball__lab__a_center);
+    pl.loadParam("ball/lab/b_center", ball_params.ball__lab__b_center);
   
-    pl.load_param("ball/hsv/hue_range", ball_params.ball__hsv__hue_range);
-    pl.load_param("ball/hsv/sat_range", ball_params.ball__hsv__sat_range);
-    pl.load_param("ball/hsv/val_range", ball_params.ball__hsv__val_range);
-    pl.load_param("ball/hsv/hue_center", ball_params.ball__hsv__hue_center);
-    pl.load_param("ball/hsv/sat_center", ball_params.ball__hsv__sat_center);
-    pl.load_param("ball/hsv/val_center", ball_params.ball__hsv__val_center);
+    pl.loadParam("ball/hsv/hue_range", ball_params.ball__hsv__hue_range);
+    pl.loadParam("ball/hsv/sat_range", ball_params.ball__hsv__sat_range);
+    pl.loadParam("ball/hsv/val_range", ball_params.ball__hsv__val_range);
+    pl.loadParam("ball/hsv/hue_center", ball_params.ball__hsv__hue_center);
+    pl.loadParam("ball/hsv/sat_center", ball_params.ball__hsv__sat_center);
+    pl.loadParam("ball/hsv/val_center", ball_params.ball__hsv__val_center);
 
     if (ball_params.binarization_method == bin_method_t::ab_lut || ball_params.binarization_method == bin_method_t::hs_lut)
     {
       std::vector<int> lut_data;
-      pl.load_param("ball/lut/data", lut_data);
-      pl.load_param("ball/lut/subsampling/x", ball_config.lutss.subsampling_x);
-      pl.load_param("ball/lut/subsampling/y", ball_config.lutss.subsampling_y);
-      pl.load_param("ball/lut/subsampling/z", ball_config.lutss.subsampling_z, 0);
+      pl.loadParam("ball/lut/data", lut_data);
+      pl.loadParam("ball/lut/subsampling/x", ball_config.lutss.subsampling_x);
+      pl.loadParam("ball/lut/subsampling/y", ball_config.lutss.subsampling_y);
+      pl.loadParam("ball/lut/subsampling/z", ball_config.lutss.subsampling_z, 0);
 
       ball_config.lutss.lut.reserve(lut_data.size());
       for (const auto el : lut_data)
@@ -743,7 +744,7 @@ namespace object_detect
     auto ball_config = load_ball_config(pl);
     load_ball_to_dynrec(ball_config.params);
     
-    if (!pl.loaded_successfully() || !m_drmgr_ptr->loaded_successfully())
+    if (!pl.loadedSuccessfully() || !m_drmgr_ptr->loaded_successfully())
     {
       ROS_ERROR("[ObjectDetector]: Invalid options set! Using old LUT.");
       resp.message = "Could not load some compulsory parameters!";
