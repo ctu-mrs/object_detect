@@ -551,6 +551,8 @@ namespace object_detect
     /** Create publishers and subscribers //{**/
     // Initialize other subs and pubs
     mrs_lib::SubscribeHandlerOptions shopts;
+    shopts.nh = m_nh;
+    shopts.node_name = m_node_name;
     shopts.no_message_timeout = ros::Duration(5.0);
     mrs_lib::construct_object(m_sh_dm, shopts, "dm_image");
     mrs_lib::construct_object(m_sh_dm_cinfo, shopts, "dm_camera_info");
