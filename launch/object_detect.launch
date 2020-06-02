@@ -12,8 +12,8 @@
 
   <arg name="color_image" value="rs_d435/color/image_raw"/>
   <arg name="color_cinfo" value="rs_d435/color/camera_info"/>
-  <arg name="depthmap_image" value="rs_d435/depth/image_rect_raw"/>
-  <arg name="depthmap_cinfo" value="rs_d435/depth/camera_info"/>
+  <arg name="depthmap_image" value="rs_d435/aligned_depth_to_color/image_rect_raw"/>
+  <arg name="depthmap_cinfo" value="rs_d435/aligned_depth_to_color/camera_info"/>
 
   <arg name="standalone" default="true" />
   <arg name="manager" default="object_detect_nodelet_manager" />
