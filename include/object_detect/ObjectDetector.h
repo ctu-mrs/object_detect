@@ -45,7 +45,7 @@
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/dynamic_reconfigure_mgr.h>
 #include <mrs_lib/profiler.h>
-#include <mrs_lib/geometry_utils.h>
+#include <mrs_lib/geometry/misc.h>
 
 // Includes from this package
 #include <object_detect/BallDetections.h>

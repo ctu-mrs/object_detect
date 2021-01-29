@@ -10,8 +10,8 @@
   <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
   <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
 
-  <arg name="color_image" value="bluefox3_front/image_raw"/>
-  <arg name="color_cinfo" value="bluefox3_front/camera_info"/>
+  <arg name="color_image" value="bluefox_optflow/image_raw"/>
+  <arg name="color_cinfo" value="bluefox_optflow/camera_info"/>
   <arg name="depthmap_image" value="bluefox3_front/depth/image_rect_raw"/>
   <arg name="depthmap_cinfo" value="bluefox3_front/depth/camera_info"/>
 

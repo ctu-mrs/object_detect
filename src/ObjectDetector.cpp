@@ -376,7 +376,7 @@ namespace object_detect
     /* // Find the rotation matrix to rotate the covariance to point in the direction of the estimated position */
     const Eigen::Vector3d a(0.0, 0.0, 1.0);
     const Eigen::Vector3d b = position_sf.normalized();
-    const auto vec_rot = mrs_lib::rotation_between(a, b);
+    const auto vec_rot = mrs_lib::geometry::rotationBetween(a, b);
     pos_cov = rotate_covariance(pos_cov, vec_rot);  // rotate the covariance to point in direction of est. position
     return pos_cov;
   }
