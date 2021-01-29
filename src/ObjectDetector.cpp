@@ -47,7 +47,7 @@ namespace object_detect
     //}
 
     const bool rgb_ready = m_sh_rgb.newMsg() && m_rgb_camera_model_valid;
-    const bool dm_ready = m_sh_dm.newMsg() && m_dm_camera_model_valid;
+    bool dm_ready = m_sh_dm.newMsg() && m_dm_camera_model_valid;
 
     // Check if we got all required messages
     if (rgb_ready)
@@ -60,10 +60,20 @@ namespace object_detect
         const sensor_msgs::ImageConstPtr dm_img_msg = m_sh_dm.getMsg();
         const cv_bridge::CvImageConstPtr dm_img_ros = cv_bridge::toCvShare(dm_img_msg, sensor_msgs::image_encodings::TYPE_16UC1);
         dm_img = dm_img_ros->image;
+        if (!m_inv_mask.empty() && (dm_img.cols != m_inv_mask.cols || dm_img.rows != m_inv_mask.rows))
+        {
+          NODELET_WARN_THROTTLE(0.5, "[ObjectDetector]: Received depthmap dimensions (%d x %d) are different from the loaded mask (%d x %d)! Cannot continue, not using depthmap.", dm_img.rows, dm_img.cols, m_inv_mask.rows, m_inv_mask.cols);
+          dm_ready = false;
+        }
       }
       const sensor_msgs::ImageConstPtr rgb_img_msg = m_sh_rgb.getMsg();
       const cv_bridge::CvImageConstPtr rgb_img_ros = cv_bridge::toCvShare(rgb_img_msg, sensor_msgs::image_encodings::BGR8);
       const cv::Mat rgb_img = rgb_img_ros->image;
+      if (!m_inv_mask.empty() && (rgb_img.cols != m_inv_mask.cols || rgb_img.rows != m_inv_mask.rows))
+      {
+        NODELET_ERROR_THROTTLE(0.5, "[ObjectDetector]: Received RGB image dimensions (%d x %d) are different from the loaded mask (%d x %d)! Cannot continue, skipping image.", rgb_img.rows, rgb_img.cols, m_inv_mask.rows, m_inv_mask.cols);
+        return;
+      }
       cv::Mat label_img;
       //}
 
