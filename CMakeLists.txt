@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1.2)
 project(object_detect)
-set( CMAKE_VERBOSE_MAKEFILE on )
+set(CMAKE_VERBOSE_MAKEFILE on)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,7 +27,7 @@ find_package(catkin REQUIRED COMPONENTS
   nodelet
 )
 
-find_package(OpenCV 3.2 REQUIRED)
+find_package(OpenCV REQUIRED)
 
 # include Eigen3
 find_package(Eigen3 REQUIRED)
@@ -71,10 +71,12 @@ include_directories(include
   ${Eigen_INCLUDE_DIRS}
 )
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -g -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
-set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3 -g -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
-set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -O3 -g -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -O3 -g -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_OPENCL -fopenmp -lstdc++fs")
+
+# set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -g -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
+# set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -O3 -g -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
+# set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -O3 -g -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
+# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -O3 -g -DUSE_OPENCL -fopenmp -DNDEBUG -lstdc++fs")
 # set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
 # set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
 # set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -Wall -g -O0 -DUSE_OPENCL")
