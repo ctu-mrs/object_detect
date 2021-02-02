@@ -6,6 +6,9 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/features2d.hpp>
 #include <opencv2/core/ocl.hpp>
+
+// set OpenCL desired version to 2.2
+#define CL_TARGET_OPENCL_VERSION 220
 #include <CL/cl.h>
 
 #include <fstream>

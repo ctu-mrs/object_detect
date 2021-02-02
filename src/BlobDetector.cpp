@@ -381,19 +381,19 @@ void BlobDetector::postprocess_binary_image(cv::Mat binary_img) const
     case 1:  // using findContours
     {
       vector<vector<cv::Point>> contours;
-      cv::findContours(binary_img, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
-      cv::drawContours(binary_img, contours, -1, cv::Scalar(255), CV_FILLED, LINE_8);
+      cv::findContours(binary_img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+      cv::drawContours(binary_img, contours, -1, cv::Scalar(255), cv::FILLED, LINE_8);
       break;
     }
     case 2:  // using convexHull
     {
       vector<vector<cv::Point>> contours;
-      cv::findContours(binary_img, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+      cv::findContours(binary_img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
       for (const auto& contour : contours)
       {
         vector<vector<cv::Point>> cx_hull(1);
         cv::convexHull(contour, cx_hull.at(0), false, true);
-        cv::drawContours(binary_img, cx_hull, 0, cv::Scalar(255), CV_FILLED, LINE_8);
+        cv::drawContours(binary_img, cx_hull, 0, cv::Scalar(255), cv::FILLED, LINE_8);
       }
       break;
     }
