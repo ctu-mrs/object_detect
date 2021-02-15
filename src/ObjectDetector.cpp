@@ -32,7 +32,7 @@ namespace object_detect
     //}
 
     /* load covariance coefficients from dynparam //{ */
-    
+
     {
       const std::pair<double&, double&> cov_coeffs_no_estimate = {m_drmgr_ptr->config.cov_coeffs__xy__no_estimate, m_drmgr_ptr->config.cov_coeffs__z__no_estimate};
       const std::pair<double&, double&> cov_coeffs_blob_size = {m_drmgr_ptr->config.cov_coeffs__xy__blob_size, m_drmgr_ptr->config.cov_coeffs__z__blob_size};
@@ -43,7 +43,7 @@ namespace object_detect
       m_cov_coeffs.insert_or_assign(dist_qual_t::depthmap, cov_coeffs_depthmap);
       m_cov_coeffs.insert_or_assign(dist_qual_t::both, cov_coeffs_both);
     }
-    
+
     //}
 
     const bool rgb_ready = m_sh_rgb.newMsg() && m_rgb_camera_model_valid;
@@ -89,7 +89,7 @@ namespace object_detect
           double min = 0;
           double max = 40000;
           cv::minMaxIdx(dm_img, &min, &max);
-          dm_img.convertTo(im_8UC1, CV_8UC1, 255.0 / (max-min), -min * 255.0 / (max-min)); 
+          dm_img.convertTo(im_8UC1, CV_8UC1, 255.0 / (max-min), -min * 255.0 / (max-min));
           cv::cvtColor(im_8UC1, dbg_img, cv::COLOR_GRAY2BGR);
           /* applyColorMap(im_8UC1, dbg_img, cv::COLORMAP_JET); */
         } else
@@ -155,7 +155,7 @@ namespace object_detect
         const Eigen::Vector3f r_vec = project(center.x + px_radius*cos(M_PI_4), center.y + px_radius*sin(M_PI_4), m_rgb_camera_model);
         const Eigen::Vector3f c_vec = (l_vec + r_vec) / 2.0f;
         //}
-        
+
         /* Estimate distance based on known size of object if applicable //{ */
         float estimated_distance = 0.0f;
         bool estimated_distance_valid = false;
@@ -304,7 +304,7 @@ namespace object_detect
 
       ROS_INFO_THROTTLE(0.5, "[%s]: Image processed", m_node_name.c_str());
     }
-    
+
   }
   //}
 
@@ -315,13 +315,13 @@ namespace object_detect
     ret.detections.reserve(balls.size());
     ret.header = header;
     ret.camera_info = cinfo;
-  
+
     for (const auto& ball : balls)
     {
       object_detect::BallDetection det;
       const auto qual = ball.dist_qual;
       const auto pos = ball.position;
-  
+
       ros_pose_t pose;
       pose.position.x = pos.x();
       pose.position.y = pos.y();
@@ -330,7 +330,7 @@ namespace object_detect
       pose.orientation.y = 0;
       pose.orientation.z = 0;
       pose.orientation.w = 1;
-  
+
       if (m_cov_coeffs.find(qual) == std::end(m_cov_coeffs))
       {
         ROS_ERROR("[ObjectDetector]: Invalid distance estimate quality %d! Skipping detection.", qual);
@@ -338,7 +338,7 @@ namespace object_detect
       }
       auto [xy_covariance_coeff, z_covariance_coeff] = m_cov_coeffs.at(qual);
       const ros_cov_t cov = generate_covariance(pos, xy_covariance_coeff, z_covariance_coeff);
-  
+
       geometry_msgs::PoseWithCovariance pose_with_cov;
       pose_with_cov.pose = pose;
       pose_with_cov.covariance = cov;
@@ -386,6 +386,7 @@ namespace object_detect
     /* // Find the rotation matrix to rotate the covariance to point in the direction of the estimated position */
     const Eigen::Vector3d a(0.0, 0.0, 1.0);
     const Eigen::Vector3d b = position_sf.normalized();
+    /* const auto vec_rot = mrs_lib::rotation_between(a, b); */
     const auto vec_rot = mrs_lib::geometry::rotationBetween(a, b);
     pos_cov = rotate_covariance(pos_cov, vec_rot);  // rotate the covariance to point in direction of est. position
     return pos_cov;
@@ -422,7 +423,7 @@ namespace object_detect
     cv::Mat dbg_mat;
     if (publish_debug)
       dbg_mat = dbg_img.getMat();
-  
+
     // recalculate the area to coordinates in the depthmap
     const cv::Point2f area_center = m_dm_camera_model.project3dToPixel({c_vec.x(), c_vec.y(), c_vec.z()});
     const cv::Point2f area_border = m_dm_camera_model.project3dToPixel({b_vec.x(), b_vec.y(), b_vec.z()});
@@ -434,7 +435,7 @@ namespace object_detect
     cv::Mat tmp_dbg_img = publish_debug ? dbg_mat(roi) : cv::Mat();
     const Size size = tmp_dm_img.size();
     size_t n_candidates = cv::sum(tmp_mask)[0]/255.0;
-  
+
     size_t n_dm_samples = 0;
     std::vector<float> dists;
     dists.reserve(n_candidates);
@@ -557,7 +558,7 @@ namespace object_detect
       ros::shutdown();
     }
     //}
-    
+
     /** Create publishers and subscribers //{**/
     // Initialize other subs and pubs
     mrs_lib::SubscribeHandlerOptions shopts;
@@ -568,7 +569,7 @@ namespace object_detect
     mrs_lib::construct_object(m_sh_dm_cinfo, shopts, "dm_camera_info");
     mrs_lib::construct_object(m_sh_rgb, shopts, "rgb_image");
     mrs_lib::construct_object(m_sh_rgb_cinfo, shopts, "rgb_camera_info");
-  
+
     image_transport::ImageTransport it(m_nh);
     m_pub_debug = it.advertise("debug_image", 1);
     m_pub_lut = it.advertise("lut", 1, true);
@@ -583,7 +584,7 @@ namespace object_detect
     //}
 
     /* load the mask //{ */
-    
+
     if (!m_mask_filename.empty())
     {
       m_inv_mask = cv::imread(m_mask_filename, cv::IMREAD_GRAYSCALE);
@@ -600,11 +601,11 @@ namespace object_detect
         cv::bitwise_not(m_inv_mask, m_inv_mask);
       }
     }
-    
+
     //}
 
     /* generate the LUT //{ */
-    
+
     {
       const auto lut_opt = regenerate_lut(ball_config);
       if (lut_opt.has_value())
@@ -626,7 +627,7 @@ namespace object_detect
         ros::shutdown();
       }
     }
-    
+
     //}
 
     m_srv_regenerate_lut = m_nh.advertiseService("regenerate_lut", &ObjectDetector::cbk_regenerate_lut, this);
@@ -683,14 +684,14 @@ namespace object_detect
 
     cfg.ball__segment_color_name = ball_params.ball__segment_color_name;
     cfg.ball__physical_diameter = ball_params.ball__physical_diameter;
-  
+
     cfg.ball__lab__l_range = ball_params.ball__lab__l_range;
     cfg.ball__lab__a_range = ball_params.ball__lab__a_range;
     cfg.ball__lab__b_range = ball_params.ball__lab__b_range;
     cfg.ball__lab__l_center = ball_params.ball__lab__l_center;
     cfg.ball__lab__a_center = ball_params.ball__lab__a_center;
     cfg.ball__lab__b_center = ball_params.ball__lab__b_center;
-  
+
     cfg.ball__hsv__hue_range = ball_params.ball__hsv__hue_range;
     cfg.ball__hsv__sat_range = ball_params.ball__hsv__sat_range;
     cfg.ball__hsv__val_range = ball_params.ball__hsv__val_range;
@@ -715,14 +716,14 @@ namespace object_detect
 
     pl.loadParam("ball/segment_color_name", ball_params.ball__segment_color_name);
     pl.loadParam("ball/physical_diameter", ball_params.ball__physical_diameter);
-  
+
     pl.loadParam("ball/lab/l_range", ball_params.ball__lab__l_range);
     pl.loadParam("ball/lab/a_range", ball_params.ball__lab__a_range);
     pl.loadParam("ball/lab/b_range", ball_params.ball__lab__b_range);
     pl.loadParam("ball/lab/l_center", ball_params.ball__lab__l_center);
     pl.loadParam("ball/lab/a_center", ball_params.ball__lab__a_center);
     pl.loadParam("ball/lab/b_center", ball_params.ball__lab__b_center);
-  
+
     pl.loadParam("ball/hsv/hue_range", ball_params.ball__hsv__hue_range);
     pl.loadParam("ball/hsv/sat_range", ball_params.ball__hsv__sat_range);
     pl.loadParam("ball/hsv/val_range", ball_params.ball__hsv__val_range);
@@ -755,7 +756,7 @@ namespace object_detect
 
     auto ball_config = load_ball_config(pl);
     load_ball_to_dynrec(ball_config.params);
-    
+
     if (!pl.loadedSuccessfully() || !m_drmgr_ptr->loaded_successfully())
     {
       ROS_ERROR("[ObjectDetector]: Invalid options set! Using old LUT.");

@@ -1,14 +1,13 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.1.2)
 # shut up some fckin cmake warning
 cmake_policy(SET CMP0048 NEW)
 
 # new cmake requires to specify project version for some reason
 project(object_detect VERSION 666)
-set( CMAKE_VERBOSE_MAKEFILE on )
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
@@ -59,7 +58,7 @@ add_message_files(
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS image_transport # roscpp rospy std_msgs
+  CATKIN_DEPENDS image_transport mrs_lib mrs_msgs roscpp std_msgs
   LIBRARIES color_mapping
 )
 

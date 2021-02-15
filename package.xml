@@ -18,6 +18,7 @@
   <depend>roscpp</depend>
   <depend>std_msgs</depend>
   <depend>mrs_msgs</depend>
+  <depend>mrs_lib</depend>
   <depend>nodelet</depend>
   <depend>image_transport</depend>
 
