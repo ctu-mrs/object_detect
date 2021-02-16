@@ -10,24 +10,14 @@ namespace object_detect
     if (colors.find(name) == std::end(colors))
       return color_id_t::unknown_color;
     else
-      return colors.at(name).first;
-  }
-
-  cv::Scalar color_highlight(color_id_t id)
-  {
-    for (const auto& keyval : colors)
-    {
-      if (keyval.second.first == id)
-        return keyval.second.second;
-    }
-    return cv::Scalar(0, 0, 128);
+      return colors.at(name);
   }
 
   std::string color_name(color_id_t id)
   {
     for (const auto& keyval : colors)
     {
-      if (keyval.second.first == id)
+      if (keyval.second == id)
         return keyval.first;
     }
     return "unknown";
