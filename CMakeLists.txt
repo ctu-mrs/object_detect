@@ -113,6 +113,16 @@ target_link_libraries(ObjectDetector
   ${OpenCV_LIBRARIES}
 )
 
+add_library(color_mapping src/color_mapping.cpp)
+add_dependencies(color_mapping
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+)
+target_link_libraries(color_mapping
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
 # add_executable(backproject_display src/backproject_display.cpp)
 # add_dependencies(backproject_display
 #   ${${PROJECT_NAME}_EXPORTED_TARGETS}
