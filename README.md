@@ -42,8 +42,8 @@ It also integrates the Object Detect package in it, so you can observe the detec
 Authors & Contact
 -----------------
 ```
-Yurii Stasinchuk <stasiyur@fel.cvut.cz>
 Matouš Vrba  <vrbamato@fel.cvut.cz> 
+Yurii Stasinchuk <stasiyur@fel.cvut.cz>
 Multi-Robot Systems mrs.felk.cvut.cz
 Faculty of electrical engineering,
 Czech Technical University in Prague
