@@ -2,8 +2,12 @@
 
 # Object detect
 
-| Build status | [![Build Status](https://github.com/ctu-mrs/object_detect/workflows/Melodic/badge.svg)](https://github.com/ctu-mrs/object_detect/actions) | [![Build Status](https://github.com/ctu-mrs/object_detect/workflows/Noetic/badge.svg)](https://github.com/ctu-mrs/object_detect/actions) |
-|--------------|-------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| Build status | [![Build Status](https://github.com/ctu-mrs/object_detect/workflows/Noetic/badge.svg)](https://github.com/ctu-mrs/object_detect/actions) |
+|--------------|------------------------------------------------------------------------------------------------------------------------------------------|
+
+## OpenCL
+
+Install OpenCL or run /scripts/install_opencl.sh
 
 
 The Object Detect is a package developed at the MRS group  for detection colorful
