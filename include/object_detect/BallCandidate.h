@@ -35,6 +35,9 @@ namespace object_detect
   struct BallCandidate
   {
     std::string type;
+    double circularity;
+    double convexity;
+    double inertia;
     cv::Point2d location;
     double radius = std::numeric_limits<double>::quiet_NaN();
     Eigen::Vector3f position = Eigen::Vector3f(std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN());

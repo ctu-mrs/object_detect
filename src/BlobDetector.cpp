@@ -642,6 +642,9 @@ std::vector<BallCandidate> BlobDetector::blobs_to_balls(const std::vector<Blob>&
   {
     BallCandidate ball;
     ball.type = m_drcfg.ball__segment_color_name;
+    ball.circularity = blob.circularity;
+    ball.convexity = blob.convexity;
+    ball.inertia = blob.inertia;
     ball.location = blob.location;
     ball.radius = blob.radius;
     ret.push_back(ball);

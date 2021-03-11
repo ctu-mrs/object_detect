@@ -59,7 +59,7 @@ add_message_files(
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS image_transport mrs_lib mrs_msgs roscpp std_msgs
-  LIBRARIES color_mapping
+  # LIBRARIES color_mapping
 )
 
 ###########

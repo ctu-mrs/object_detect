@@ -326,9 +326,9 @@ namespace object_detect
       pose.position.x = pos.x();
       pose.position.y = pos.y();
       pose.position.z = pos.z();
-      pose.orientation.x = 0;
-      pose.orientation.y = 0;
-      pose.orientation.z = 0;
+      pose.orientation.x = ball.circularity;
+      pose.orientation.y = ball.convexity;
+      pose.orientation.z = ball.inertia;
       pose.orientation.w = 1;
 
       if (m_cov_coeffs.find(qual) == std::end(m_cov_coeffs))
