@@ -60,7 +60,7 @@ The tool is integrated with this package, allowing on-the-fly tuning.
 ## References
 If you use this work, please consider citing [1].
 
- * [1] Y. Stasinchuk, M. Vrba, M. Petrlík, T. Báča, V. Spurný, D. Heřt, D. Žaitlík, T. Nascimento and M. Saska, **"A Multi-UAV System for Detection and Elimination of Multiple Targets,"** accepted to ICRA 2021.
+ * [1]: Y. Stasinchuk, M. Vrba, M. Petrlík, T. Báča, V. Spurný, D. Heřt, D. Žaitlík, T. Nascimento and M. Saska, **"A Multi-UAV System for Detection and Elimination of Multiple Targets,"** accepted to ICRA 2021.
  * [2]: T. Báča, M. Petrlík, M. Vrba, V. Spurný, R. Pěnička, D. Heřt and M. Saska, **"The MRS UAV System: Pushing the Frontiers of Reproducible Research, Real-world Deployment, and Education with Autonomous Unmanned Aerial Vehicles"**, eprint arXiv: 2008.08050, accepted to JINT 2021 (https://arxiv.org/abs/2008.08050).
 
 ## Authors & Contact
