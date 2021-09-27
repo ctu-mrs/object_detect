@@ -238,11 +238,8 @@ namespace object_detect
       //}
 
       /* Publish all the calculated valid positions //{ */
-      if (m_pub_det.getNumSubscribers() > 0)
-      {
-        const object_detect::BallDetections det_msg = to_output_message(balls, rgb_img_msg->header, m_rgb_camera_model.cameraInfo());
-        m_pub_det.publish(det_msg);
-      }
+      const object_detect::BallDetections det_msg = to_output_message(balls, rgb_img_msg->header, m_rgb_camera_model.cameraInfo());
+      m_pub_det.publish(det_msg);
       //}
 
       /* Publish all the calculated valid positions as pointcloud (for debugging) //{ */
@@ -278,6 +275,24 @@ namespace object_detect
         }
 
         m_pub_pcl.publish(pcl_msg);
+      }
+      //}
+
+      /* Publish all the calculated valid positions as pose array (for debugging) //{ */
+      if (m_pub_posearr.getNumSubscribers() > 0)
+      {
+        mrs_msgs::PoseWithCovarianceArrayStamped msg;
+        msg.header = rgb_img_msg->header;
+
+        for (const auto& det : det_msg.detections)
+        {
+          mrs_msgs::PoseWithCovarianceIdentified pose;
+          pose.pose = det.pose.pose;
+          pose.covariance = pose.covariance;
+          msg.poses.push_back(pose);
+        }
+
+        m_pub_posearr.publish(msg);
       }
       //}
 
@@ -574,6 +589,7 @@ namespace object_detect
     m_pub_debug = it.advertise("debug_image", 1);
     m_pub_lut = it.advertise("lut", 1, true);
     m_pub_pcl = m_nh.advertise<sensor_msgs::PointCloud2>("detected_balls_pcl", 10);
+    m_pub_posearr = m_nh.advertise<mrs_msgs::PoseWithCovarianceArrayStamped>("detected_balls_posearr", 10);
     m_pub_det = m_nh.advertise<object_detect::BallDetections>("detected_balls", 10);
     //}
 

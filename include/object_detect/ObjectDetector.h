@@ -41,6 +41,7 @@
 #include <algorithm>
 
 // MRS includes
+#include <mrs_msgs/PoseWithCovarianceArrayStamped.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/dynamic_reconfigure_mgr.h>
@@ -124,6 +125,7 @@ namespace object_detect
 
       ros::Publisher m_pub_det;
       ros::Publisher m_pub_pcl;
+      ros::Publisher m_pub_posearr;
       image_transport::Publisher m_pub_debug;
       image_transport::Publisher m_pub_lut;
 
