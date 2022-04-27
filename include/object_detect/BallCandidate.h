@@ -7,14 +7,6 @@
 
 namespace object_detect
 {
-  enum dist_qual_t
-  {
-    unknown_qual = -1,
-    no_estimate = 0,
-    blob_size = 1,
-    depthmap = 2,
-    both = 3,
-  };
 
   /* helper functions for dist_qual_t //{ */
   

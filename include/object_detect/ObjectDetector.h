@@ -28,6 +28,9 @@
 #include <dynamic_reconfigure/server.h>
 #include <std_srvs/Trigger.h>
 
+#include <visualanalysis_msgs/TargetLocations2D.h>
+#include <visualanalysis_msgs/ROI2D.h>
+
 // Eigen includes
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -50,14 +53,8 @@
 #include <mrs_lib/geometry/cyclic.h>
 
 // Includes from this package
-#include <object_detect/BallDetections.h>
 #include <object_detect/DetectionParamsConfig.h>
-#include "object_detect/BallConfig.h"
-#include "object_detect/BallCandidate.h"
-#include "object_detect/BlobDetector.h"
 #include "object_detect/utility_fcs.h"
-#include "object_detect/color_mapping.h"
-#include "object_detect/lut_fcs.h"
 
 //}
 
@@ -71,31 +68,32 @@ namespace object_detect
   // shortcut type to the dynamic reconfigure manager template instance
   typedef mrs_lib::DynamicReconfigureMgr<object_detect::DetectionParamsConfig> drmgr_t;
 
+  using ros_cov_t = mrs_msgs::PoseWithCovarianceArrayStamped::_poses_type::_covariance_type;
+
+  enum dist_qual_t
+  {
+    unknown_qual = -1,
+    no_estimate = 0,
+    blob_size = 1,
+    depthmap = 2,
+    both = 3,
+  };
+
   /* //{ class ObjectDetector */
 
   class ObjectDetector : public nodelet::Nodelet
   {
 
-    private:
-
-      using ros_pose_t = BallDetection::_pose_type::_pose_type;
-      using ros_cov_t = BallDetection::_pose_type::_covariance_type;
-
     public:
       ObjectDetector() : m_node_name("ObjectDetector"), m_dm_camera_model_valid(false), m_rgb_camera_model_valid(false) {};
       virtual void onInit();
       bool cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp);
-      std::optional<object_detect::lut_t> regenerate_lut(const BallConfig& ball_config);
 
     private:
       void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
-      object_detect::BallDetections to_output_message(const std::vector<BallCandidate>& balls, const std_msgs::Header& header, const sensor_msgs::CameraInfo& cinfo) const;
       static ros_cov_t generate_covariance(const Eigen::Vector3f& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);
-      void highlight_mask(cv::Mat& img, const cv::Mat label_img, const cv::Scalar color, const bool invert = false);
-      void load_ball_to_dynrec(const ball_params_t& params);
-      BallConfig load_ball_config(mrs_lib::ParamLoader& pl);
 
     private:
       // --------------------------------------------------------------
@@ -118,9 +116,10 @@ namespace object_detect
 
       std::unique_ptr<drmgr_t> m_drmgr_ptr;
 
+      mrs_lib::SubscribeHandler<visualanalysis_msgs::TargetLocations2D> m_sh_dets;
+      mrs_lib::SubscribeHandler<sensor_msgs::Image> m_sh_rgb;
       mrs_lib::SubscribeHandler<sensor_msgs::Image> m_sh_dm;
       mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_sh_dm_cinfo;
-      mrs_lib::SubscribeHandler<sensor_msgs::Image> m_sh_rgb;
       mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_sh_rgb_cinfo;
 
       ros::Publisher m_pub_det;
@@ -160,13 +159,12 @@ namespace object_detect
       // --------------------------------------------------------------
 
       //{
-      //
       // Checks whether a calculated distance is valid
       bool distance_valid(float distance);
       // Estimates distance of an object based on the 3D vectors pointing to its center and one of its edges and known distance between the edges
-      float estimate_distance_from_known_diameter(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, float physical_diameter);
+      float estimate_distance_from_known_height(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, float physical_diameter);
       // Estimates distance based on information from a depthmap, masked using the binary thresholded image, optionally marks used pixels in the debug image
-      float estimate_distance_from_depthmap(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img);
+      float estimate_distance_from_depthmap(const cv::Rect& roi, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img);
       //}
 
   };

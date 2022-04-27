@@ -27,6 +27,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_sensor_msgs
   tf2_eigen
   tf2_geometry_msgs
+  visualanalysis_msgs
   nodelet
 )
 
@@ -103,22 +104,12 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-std=c++17 -Wall -O3 -g -DUSE_OPENCL -fopenm
 #   ${OpenCV_LIBRARIES}
 # )
 
-add_library(ObjectDetector src/ObjectDetector.cpp src/BlobDetector.cpp src/BallCandidate.cpp src/utility_fcs.cpp src/lut.cpp src/lut_fcs.cpp src/color_mapping.cpp)
+add_library(ObjectDetector src/ObjectDetector.cpp src/utility_fcs.cpp)
 add_dependencies(ObjectDetector
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
 )
 target_link_libraries(ObjectDetector
-  ${catkin_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-)
-
-add_library(color_mapping src/color_mapping.cpp)
-add_dependencies(color_mapping
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-)
-target_link_libraries(color_mapping
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )

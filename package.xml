@@ -21,6 +21,7 @@
   <depend>mrs_lib</depend>
   <depend>nodelet</depend>
   <depend>image_transport</depend>
+  <depend>visualanalysis_msgs</depend>
 
   <build_depend>message_generation</build_depend>
 
