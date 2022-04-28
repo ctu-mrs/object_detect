@@ -37,6 +37,7 @@
       <remap from="~rgb_camera_info" to="$(arg color_cinfo)" />
 
       <remap from="~debug_image" to="~debug_image" />
+      <remap from="~segmentation_mask" to="~segmentation_mask" />
       <remap from="~detected_objects_pcl" to="~detected_balls_pcl" />
       <remap from="~detected_objects" to="~detected_balls" />
 

@@ -137,7 +137,7 @@ namespace object_detect
       ros::Publisher m_pub_pcl;
       ros::Publisher m_pub_posearr;
       image_transport::Publisher m_pub_debug;
-      image_transport::Publisher m_pub_lut;
+      image_transport::Publisher m_pub_seg_mask;
 
       ros::ServiceServer m_srv_regenerate_lut;
 
@@ -174,7 +174,7 @@ namespace object_detect
       // Estimates distance of an object based on the 3D vectors pointing to its center and one of its edges and known distance between the edges
       float estimate_distance_from_known_height(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, float physical_diameter);
       // Estimates distance based on information from a depthmap, masked using the binary thresholded image, optionally marks used pixels in the debug image
-      float estimate_distance_from_depthmap(const cv::Rect& roi, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img);
+      float estimate_distance_from_depthmap(const cv::Rect& roi, const double min_valid_ratio, const cv::Mat& dm_img, const cv::Mat& seg_mask, cv::InputOutputArray dbg_img);
       //}
 
   };

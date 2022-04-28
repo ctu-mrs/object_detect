@@ -108,6 +108,14 @@ namespace object_detect
         NODELET_ERROR_THROTTLE(0.5, "[ObjectDetector]: Received RGB image dimensions (%d x %d) are different from the loaded mask (%d x %d)! Cannot continue, skipping image.", rgb_img.rows, rgb_img.cols, m_inv_mask.rows, m_inv_mask.cols);
         return;
       }
+
+      const cv_bridge::CvImageConstPtr seg_mask_ros = cv_bridge::toCvCopy(det_msg->segmentation_map, sensor_msgs::image_encodings::TYPE_16UC1);
+      cv::Mat seg_mask = seg_mask_ros->image;
+      if (seg_mask.cols != rgb_img.cols || seg_mask.rows != rgb_img.rows)
+      {
+        NODELET_WARN_THROTTLE(0.5, "[ObjectDetector]: Received RGB image dimensions (%d x %d) are different from the segmentation mask (%d x %d)! Ignoring mask.", rgb_img.rows, rgb_img.cols, seg_mask.rows, seg_mask.cols);
+        seg_mask = cv::Mat();
+      }
       //}
 
       /* Prepare debug image if needed //{ */
@@ -169,7 +177,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(roi, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(roi, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, seg_mask, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           /* cout << "Depthmap distance: " << depthmap_distance << endl; */
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -271,6 +279,20 @@ namespace object_detect
         dbg_img_msg->header = rgb_img_msg->header;
         m_pub_debug.publish(dbg_img_msg);
       }
+
+      if (m_pub_seg_mask.getNumSubscribers() > 0)
+      {
+        double minval, maxval;
+        cv::minMaxIdx(seg_mask, &minval, &maxval);
+        cv::Mat im_8UC1;
+        seg_mask.convertTo(im_8UC1, CV_8UC1, 255/(maxval-minval), -minval);
+        cv::applyColorMap(im_8UC1, im_8UC1, cv::COLORMAP_JET);
+        cv_bridge::CvImage seg_mask_ros(rgb_img_msg->header, sensor_msgs::image_encodings::BGR8, im_8UC1);
+        sensor_msgs::ImagePtr seg_mask_msg;
+        seg_mask_msg = seg_mask_ros.toImageMsg();
+        seg_mask_msg->header = rgb_img_msg->header;
+        m_pub_seg_mask.publish(seg_mask_msg);
+      }
       //}
 
       /* Some primitive profiling info //{ */
@@ -356,7 +378,7 @@ namespace object_detect
   //}
 
   /* estimate_distance_from_depthmap() method //{ */
-  float ObjectDetector::estimate_distance_from_depthmap(const cv::Rect& roi, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img)
+  float ObjectDetector::estimate_distance_from_depthmap(const cv::Rect& roi, const double min_valid_ratio, const cv::Mat& dm_img, const cv::Mat& seg_mask, cv::InputOutputArray dbg_img)
   {
     bool publish_debug = dbg_img.needed();
     cv::Mat dbg_mat;
@@ -369,6 +391,7 @@ namespace object_detect
     const int br_y = std::clamp(roi.br().y, 0, dm_img.rows-1);
     const cv::Rect roi_clamped(cv::Point(tl_x, tl_y), cv::Point(br_x, br_y));
     const cv::Mat tmp_dm_img = dm_img(roi_clamped);
+    const cv::Mat tmp_seg_mask = seg_mask.empty() ? cv::Mat() : seg_mask(roi_clamped);
     cv::Mat tmp_dbg_img = publish_debug ? dbg_mat(roi) : cv::Mat();
     const Size size = tmp_dm_img.size();
     size_t n_candidates = tmp_dm_img.rows*tmp_dm_img.cols/255.0;
@@ -382,6 +405,8 @@ namespace object_detect
     {
       for (int y = 0; y < size.height; y++)
       {
+        if (!seg_mask.empty() && !tmp_seg_mask.at<uint8_t>(y, x))
+          continue;
         const uint16_t depth = tmp_dm_img.at<uint16_t>(y, x);
         // skip invalid measurements
         if (depth <= m_min_depth
@@ -503,6 +528,7 @@ namespace object_detect
 
     image_transport::ImageTransport it(m_nh);
     m_pub_debug = it.advertise("debug_image", 1);
+    m_pub_seg_mask = it.advertise("segmentation_mask", 1);
     m_pub_pcl = m_nh.advertise<sensor_msgs::PointCloud2>("detected_objects_pcl", 10);
     m_pub_posearr = m_nh.advertise<mrs_msgs::PoseWithCovarianceArrayStamped>("detected_objects_posearr", 10);
     //}
