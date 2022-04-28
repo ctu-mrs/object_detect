@@ -1,0 +1,48 @@
+<launch>
+
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+  <arg name="respawn" default="false" />
+
+  <arg name="debug" default="false" />
+  <arg unless="$(arg debug)" name="launch_prefix_debug" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix_debug" value="debug_roslaunch"/>
+  <arg name="profile" default="false" />
+  <arg unless="$(arg profile)" name="launch_prefix_profile" value=""/>
+  <arg     if="$(arg profile)" name="launch_prefix_profile" value="valgrind --tool=callgrind --dump-instr=yes --simulate-cache=yes --collect-jumps=yes"/>
+
+  <arg name="color_image" value="rgbd/color/image_raw"/>
+  <arg name="color_cinfo" value="rgbd/color/camera_info"/>
+  <arg name="depthmap_image" value="rgbd/aligned_depth_to_color/image_rect_raw"/>
+  <arg name="depthmap_cinfo" value="rgbd/aligned_depth_to_color/camera_info"/>
+
+  <arg name="standalone" default="true" />
+  <arg name="manager" default="object_detect_nodelet_manager" />
+  <arg name="nodelet_name" value="object_detect/ObjectDetector" />
+  <arg unless="$(arg standalone)" name="nodelet_load" value="load $(arg nodelet_name) $(arg manager)"/>
+  <arg     if="$(arg standalone)" name="nodelet_load" value="standalone $(arg nodelet_name)"/>
+
+  <group ns="$(arg uav_name)">
+
+    <node pkg="nodelet" type="nodelet" name="position_estimator" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile)" respawn="$(arg respawn)" >
+      
+      <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
+      <param name="mask_filename" value="" />
+
+      <remap from="~detections" to="visualanalysis/target_detections" />
+      <!-- <remap from="~detections" to="/detections" /> -->
+
+      <remap from="~dm_image" to="$(arg depthmap_image)" />
+      <remap from="~dm_camera_info" to="$(arg depthmap_cinfo)" />
+      <remap from="~rgb_image" to="$(arg color_image)" />
+      <remap from="~rgb_camera_info" to="$(arg color_cinfo)" />
+
+      <remap from="~debug_image" to="~debug_image" />
+      <remap from="~detected_objects_pcl" to="~detected_balls_pcl" />
+      <remap from="~detected_objects" to="~detected_balls" />
+
+    </node>
+  
+  </group>
+
+</launch>
+

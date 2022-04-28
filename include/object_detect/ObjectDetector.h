@@ -26,7 +26,12 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2/LinearMath/Vector3.h>
 #include <dynamic_reconfigure/server.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
 #include <std_srvs/Trigger.h>
+
+#include <boost/circular_buffer.hpp>
 
 #include <visualanalysis_msgs/TargetLocations2D.h>
 #include <visualanalysis_msgs/ROI2D.h>
@@ -90,7 +95,7 @@ namespace object_detect
       bool cbk_regenerate_lut([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp);
 
     private:
-      void main_loop([[maybe_unused]] const ros::TimerEvent& evt);
+      void main_loop(const sensor_msgs::Image::ConstPtr& rgb_img_msg, const visualanalysis_msgs::TargetLocations2D::ConstPtr& det_msg);
       static ros_cov_t generate_covariance(const Eigen::Vector3f& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);
@@ -117,8 +122,11 @@ namespace object_detect
 
       std::unique_ptr<drmgr_t> m_drmgr_ptr;
 
-      mrs_lib::SubscribeHandler<visualanalysis_msgs::TargetLocations2D> m_sh_dets;
-      mrs_lib::SubscribeHandler<sensor_msgs::Image> m_sh_rgb;
+      using sync_policy = message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, visualanalysis_msgs::TargetLocations2D>;
+      std::unique_ptr<message_filters::Subscriber<sensor_msgs::Image>> m_sub_rgb;
+      std::unique_ptr<message_filters::Subscriber<visualanalysis_msgs::TargetLocations2D>> m_sub_det;
+      std::unique_ptr<message_filters::Synchronizer<sync_policy>> m_sync;
+
       mrs_lib::SubscribeHandler<sensor_msgs::Image> m_sh_dm;
       mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_sh_dm_cinfo;
       mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_sh_rgb_cinfo;
@@ -131,7 +139,6 @@ namespace object_detect
 
       ros::ServiceServer m_srv_regenerate_lut;
 
-      ros::Timer m_main_loop_timer;
       //}
 
     private:
@@ -148,6 +155,8 @@ namespace object_detect
       image_geometry::PinholeCameraModel m_dm_camera_model;
       bool m_rgb_camera_model_valid;
       image_geometry::PinholeCameraModel m_rgb_camera_model;
+
+      boost::circular_buffer<sensor_msgs::Image::ConstPtr> m_dm_bfr;
 
       cv::Mat m_inv_mask;
       //}

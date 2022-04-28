@@ -10,7 +10,7 @@ namespace object_detect
 {
 
   /* main_loop() method //{ */
-  void ObjectDetector::main_loop([[maybe_unused]] const ros::TimerEvent& evt)
+  void ObjectDetector::main_loop(const sensor_msgs::Image::ConstPtr& rgb_img_msg, const visualanalysis_msgs::TargetLocations2D::ConstPtr& det_msg)
   {
     /* Initialize the camera models //{ */
     if (m_sh_dm_cinfo.hasMsg() && !m_dm_camera_model_valid)
@@ -46,16 +46,15 @@ namespace object_detect
 
     //}
 
-    const bool rgb_ready = m_sh_rgb.newMsg() && m_rgb_camera_model_valid;
+    const bool rgb_ready = m_rgb_camera_model_valid;
     bool dm_ready = m_sh_dm.newMsg() && m_dm_camera_model_valid;
 
     // Check if we got all required messages
-    if (m_sh_dets.newMsg() && rgb_ready)
+    if (rgb_ready)
     {
       /* Copy values from subscribers to local variables //{ */
       const ros::WallTime start_t = ros::WallTime::now();
 
-      const auto det_msg = m_sh_dets.getMsg();
       const auto& detections = det_msg->detections;
 
       cv::Mat dm_img;
@@ -71,7 +70,6 @@ namespace object_detect
         }
       }
 
-      const sensor_msgs::ImageConstPtr rgb_img_msg = m_sh_rgb.getMsg();
       const cv_bridge::CvImageConstPtr rgb_img_ros = cv_bridge::toCvShare(rgb_img_msg, sensor_msgs::image_encodings::BGR8);
       const cv::Mat rgb_img = rgb_img_ros->image;
       if (!m_inv_mask.empty() && (rgb_img.cols != m_inv_mask.cols || rgb_img.rows != m_inv_mask.rows))
@@ -112,8 +110,8 @@ namespace object_detect
         /* cout << "[" << m_node_name << "]: Processing object " << it + 1 << "/" << detections.size() << " --------------------------" << std::endl; */
 
         const visualanalysis_msgs::ROI2D& object = detections.at(it);
-        const cv::Point2f center(object.x, object.y);
-        const cv::Point2f topleft(object.x - object.w/2.0f, object.y - object.h/2.0f);
+        const cv::Point2f topleft(object.x, object.y);
+        const cv::Point2f center(object.x + object.w/2.0f, object.y + object.h/2.0f);
         const cv::Size size(object.w, object.h);
         const bool physical_dimension_known = m_drmgr_ptr->config.object__physical_height > 0.0;
         const cv::Rect roi(topleft, size);
@@ -171,8 +169,8 @@ namespace object_detect
         {
           cv::rectangle(dbg_img, roi, cv::Scalar(0, 0, 255), 2);
           cv::putText(dbg_img, std::to_string(resulting_distance_quality), topleft, cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", cv::Point2d(topleft.x, topleft.y-size.height), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", cv::Point2d(topleft.x+size.width, topleft.y-size.height), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", cv::Point2d(topleft.x+size.width, topleft.y), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", cv::Point2d(topleft.x+size.width, topleft.y+size.height), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
         }
 
         /* cout << "Estimated distance used: " << physical_dimension_known */
@@ -433,8 +431,6 @@ namespace object_detect
     pl.loadParam("max_depth", m_max_depth);
     pl.loadParam("mask_filename", m_mask_filename, ""s);
 
-    double loop_rate = pl.loadParam2<double>("loop_rate", 100);
-
     if (!m_drmgr_ptr->loaded_successfully())
     {
       ROS_ERROR("[%s]: Some default values of dynamically reconfigurable parameters were not loaded successfully, ending the node", m_node_name.c_str());
@@ -450,14 +446,18 @@ namespace object_detect
 
     /** Create publishers and subscribers //{**/
     // Initialize other subs and pubs
+
+    m_sub_rgb = std::make_unique<message_filters::Subscriber<sensor_msgs::Image>>(m_nh, "rgb_image", 30);
+    m_sub_det = std::make_unique<message_filters::Subscriber<visualanalysis_msgs::TargetLocations2D>>(m_nh, "detections", 5);
+    m_sync = std::make_unique<message_filters::Synchronizer<sync_policy>>(sync_policy(30), *m_sub_rgb, *m_sub_det);
+    m_sync->registerCallback(boost::bind(&ObjectDetector::main_loop, this, boost::placeholders::_1, boost::placeholders::_2));
+
     mrs_lib::SubscribeHandlerOptions shopts;
     shopts.nh = m_nh;
     shopts.node_name = m_node_name;
     shopts.no_message_timeout = ros::Duration(5.0);
-    mrs_lib::construct_object(m_sh_dets, shopts, "detections");
     mrs_lib::construct_object(m_sh_dm, shopts, "dm_image");
     mrs_lib::construct_object(m_sh_dm_cinfo, shopts, "dm_camera_info");
-    mrs_lib::construct_object(m_sh_rgb, shopts, "rgb_image");
     mrs_lib::construct_object(m_sh_rgb_cinfo, shopts, "rgb_camera_info");
 
     image_transport::ImageTransport it(m_nh);
@@ -466,13 +466,8 @@ namespace object_detect
     m_pub_posearr = m_nh.advertise<mrs_msgs::PoseWithCovarianceArrayStamped>("detected_objects_posearr", 10);
     //}
 
+    m_dm_bfr.set_capacity(30);
     m_is_initialized = true;
-
-    /* timers  //{ */
-
-    m_main_loop_timer = m_nh.createTimer(ros::Rate(loop_rate), &ObjectDetector::main_loop, this);
-
-    //}
 
     ROS_INFO("[%s]: Initialized ------------------------------", m_node_name.c_str());
   }
