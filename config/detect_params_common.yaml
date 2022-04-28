@@ -7,7 +7,7 @@ min_depth: 200 # millimetres
 max_depth: 12000 # millimetres
 distance_min_valid_pixels_ratio: 0.05
 object:
-  physical_height: 1.9 # metres
+  physical_height: 1.78 # metres
 
  ############### Other parameters ###############
 # xy_covariance_coeff: 0.001

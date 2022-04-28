@@ -70,7 +70,7 @@ namespace object_detect
     //}
 
     const bool rgb_ready = m_rgb_camera_model_valid;
-    bool dm_ready = m_sh_dm.newMsg() && m_dm_camera_model_valid;
+    bool dm_ready = m_sh_dm.hasMsg() && m_dm_camera_model_valid;
 
     // Check if we got all required messages
     if (rgb_ready)
@@ -84,12 +84,20 @@ namespace object_detect
       if (dm_ready)
       {
         const sensor_msgs::ImageConstPtr dm_img_msg = find_msg(m_dm_bfr, det_msg->header.stamp);
-        const cv_bridge::CvImageConstPtr dm_img_ros = cv_bridge::toCvShare(dm_img_msg, sensor_msgs::image_encodings::TYPE_16UC1);
-        dm_img = dm_img_ros->image;
-        if (!m_inv_mask.empty() && (dm_img.cols != m_inv_mask.cols || dm_img.rows != m_inv_mask.rows))
+        if (!dm_img_msg)
         {
-          NODELET_WARN_THROTTLE(0.5, "[ObjectDetector]: Received depthmap dimensions (%d x %d) are different from the loaded mask (%d x %d)! Cannot continue, not using depthmap.", dm_img.rows, dm_img.cols, m_inv_mask.rows, m_inv_mask.cols);
+          NODELET_WARN_THROTTLE(0.5, "[ObjectDetector]: No depthmap in the buffer! Cannot continue, not using depthmap.");
           dm_ready = false;
+        }
+        else
+        {
+          const cv_bridge::CvImageConstPtr dm_img_ros = cv_bridge::toCvShare(dm_img_msg, sensor_msgs::image_encodings::TYPE_16UC1);
+          dm_img = dm_img_ros->image;
+          if (!m_inv_mask.empty() && (dm_img.cols != m_inv_mask.cols || dm_img.rows != m_inv_mask.rows))
+          {
+            NODELET_WARN_THROTTLE(0.5, "[ObjectDetector]: Received depthmap dimensions (%d x %d) are different from the loaded mask (%d x %d)! Cannot continue, not using depthmap.", dm_img.rows, dm_img.cols, m_inv_mask.rows, m_inv_mask.cols);
+            dm_ready = false;
+          }
         }
       }
 
@@ -355,10 +363,15 @@ namespace object_detect
     if (publish_debug)
       dbg_mat = dbg_img.getMat();
 
-    const cv::Mat tmp_dm_img = dm_img(roi);
+    const int tl_x = std::clamp(roi.tl().x, 0, dm_img.cols-1);
+    const int tl_y = std::clamp(roi.tl().y, 0, dm_img.rows-1);
+    const int br_x = std::clamp(roi.br().x, 0, dm_img.cols-1);
+    const int br_y = std::clamp(roi.br().y, 0, dm_img.rows-1);
+    const cv::Rect roi_clamped(cv::Point(tl_x, tl_y), cv::Point(br_x, br_y));
+    const cv::Mat tmp_dm_img = dm_img(roi_clamped);
     cv::Mat tmp_dbg_img = publish_debug ? dbg_mat(roi) : cv::Mat();
     const Size size = tmp_dm_img.size();
-    size_t n_candidates = tmp_dbg_img.rows*tmp_dbg_img.cols/255.0;
+    size_t n_candidates = tmp_dm_img.rows*tmp_dm_img.cols/255.0;
 
     size_t n_dm_samples = 0;
     std::vector<float> dists;
