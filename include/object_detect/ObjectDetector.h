@@ -127,7 +127,9 @@ namespace object_detect
       std::unique_ptr<message_filters::Subscriber<visualanalysis_msgs::TargetLocations2D>> m_sub_det;
       std::unique_ptr<message_filters::Synchronizer<sync_policy>> m_sync;
 
+      mrs_lib::SubscribeHandler<visualanalysis_msgs::TargetLocations2D> m_sh_dets;
       mrs_lib::SubscribeHandler<sensor_msgs::Image> m_sh_dm;
+      mrs_lib::SubscribeHandler<sensor_msgs::Image> m_sh_rgb;
       mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_sh_dm_cinfo;
       mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_sh_rgb_cinfo;
 

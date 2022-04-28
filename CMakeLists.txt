@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.1.2)
 # shut up some fckin cmake warning
-cmake_policy(SET CMP0048 NEW)
+# cmake_policy(SET CMP0048 NEW)
 
 # new cmake requires to specify project version for some reason
-project(object_detect VERSION 666)
+# project(object_detect VERSION 666)
+project(object_detect)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -31,7 +32,7 @@ find_package(catkin REQUIRED COMPONENTS
   nodelet
 )
 
-find_package(OpenCV 4.2 REQUIRED)
+find_package(OpenCV REQUIRED)
 
 # include Eigen3
 find_package(Eigen3 REQUIRED)

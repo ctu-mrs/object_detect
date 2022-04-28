@@ -28,8 +28,8 @@
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
       <param name="mask_filename" value="" />
 
-      <remap from="~detections" to="visualanalysis/target_detections" />
-      <!-- <remap from="~detections" to="/detections" /> -->
+      <!-- <remap from="~detections" to="visualanalysis/target_detections" /> -->
+      <remap from="~detections" to="/detections" />
 
       <remap from="~dm_image" to="$(arg depthmap_image)" />
       <remap from="~dm_camera_info" to="$(arg depthmap_cinfo)" />

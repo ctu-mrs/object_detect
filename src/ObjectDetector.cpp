@@ -9,6 +9,29 @@ using namespace mrs_lib;
 namespace object_detect
 {
 
+  /* find_msg() method //{ */
+  sensor_msgs::Image::ConstPtr find_msg(const boost::circular_buffer<sensor_msgs::Image::ConstPtr>& bfr, const ros::Time& stamp)
+  {
+    if (bfr.empty())
+      return nullptr;
+  
+    sensor_msgs::Image::ConstPtr last_msg = bfr.front();
+    for (const auto& msg : bfr)
+    {
+      if (msg->header.stamp > stamp)
+      {
+        const double diff_last = std::abs((last_msg->header.stamp - stamp).toSec());
+        const double diff_cur = std::abs((msg->header.stamp - stamp).toSec());
+        if (diff_last > diff_cur)
+          last_msg = msg;
+        break;
+      }
+      last_msg = msg;
+    }
+    return last_msg;
+  }
+  //}
+
   /* main_loop() method //{ */
   void ObjectDetector::main_loop(const sensor_msgs::Image::ConstPtr& rgb_img_msg, const visualanalysis_msgs::TargetLocations2D::ConstPtr& det_msg)
   {
@@ -60,7 +83,7 @@ namespace object_detect
       cv::Mat dm_img;
       if (dm_ready)
       {
-        const sensor_msgs::ImageConstPtr dm_img_msg = m_sh_dm.getMsg();
+        const sensor_msgs::ImageConstPtr dm_img_msg = find_msg(m_dm_bfr, det_msg->header.stamp);
         const cv_bridge::CvImageConstPtr dm_img_ros = cv_bridge::toCvShare(dm_img_msg, sensor_msgs::image_encodings::TYPE_16UC1);
         dm_img = dm_img_ros->image;
         if (!m_inv_mask.empty() && (dm_img.cols != m_inv_mask.cols || dm_img.rows != m_inv_mask.rows))
@@ -456,7 +479,12 @@ namespace object_detect
     shopts.nh = m_nh;
     shopts.node_name = m_node_name;
     shopts.no_message_timeout = ros::Duration(5.0);
-    mrs_lib::construct_object(m_sh_dm, shopts, "dm_image");
+    mrs_lib::construct_object(m_sh_dets, shopts, "detections");
+    mrs_lib::construct_object(m_sh_rgb, shopts, "rgb_image");
+    mrs_lib::construct_object(m_sh_dm, shopts, "dm_image", [this](mrs_lib::SubscribeHandler<sensor_msgs::Image>& sh)
+        {
+          m_dm_bfr.push_back(sh.getMsg());
+        });
     mrs_lib::construct_object(m_sh_dm_cinfo, shopts, "dm_camera_info");
     mrs_lib::construct_object(m_sh_rgb_cinfo, shopts, "rgb_camera_info");
 
