@@ -12,7 +12,7 @@
 
   <arg name="color_image" value="rgbd/color/image_raw"/>
   <arg name="color_cinfo" value="rgbd/color/camera_info"/>
-  <arg name="depthmap_image" value="rgbd/aligned_depth_to_color/image_rect_raw"/>
+  <arg name="depthmap_image" value="rgbd/aligned_depth_to_color/image_raw"/>
   <arg name="depthmap_cinfo" value="rgbd/aligned_depth_to_color/camera_info"/>
 
   <arg name="standalone" default="true" />
