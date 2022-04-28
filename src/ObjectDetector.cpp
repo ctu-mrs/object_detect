@@ -56,7 +56,7 @@ namespace object_detect
       const ros::WallTime start_t = ros::WallTime::now();
 
       const auto det_msg = m_sh_dets.getMsg();
-      const auto& detections = det_msg.detections;
+      const auto& detections = det_msg->detections;
 
       cv::Mat dm_img;
       if (dm_ready)
@@ -105,21 +105,22 @@ namespace object_detect
       //}
 
       /* Calculate 3D positions of the detected objects //{ */
-      vector<std::pair<Eigen::Vector3d, dist_qual_t>> posests;
+      vector<std::pair<Eigen::Vector3f, dist_qual_t>> posests;
 
       for (size_t it = 0; it < detections.size(); it++)
       {
         /* cout << "[" << m_node_name << "]: Processing object " << it + 1 << "/" << detections.size() << " --------------------------" << std::endl; */
 
         const visualanalysis_msgs::ROI2D& object = detections.at(it);
-        const cv::Point center(object.x, object.y);
-        const cv::Vec2d size(object.w, object.h);
+        const cv::Point2f center(object.x, object.y);
+        const cv::Point2f topleft(object.x - object.w/2.0f, object.y - object.h/2.0f);
+        const cv::Size size(object.w, object.h);
         const bool physical_dimension_known = m_drmgr_ptr->config.object__physical_height > 0.0;
-        const cv::Rect roi(center-size/2.0, center+size/2.0);
+        const cv::Rect roi(topleft, size);
 
         /* Calculate 3D vector pointing to left and right edges of the detected object //{ */
-        const Eigen::Vector3f t_vec = project(center.x - object.h/2.0*cos(M_PI_4), center.y - object.h/2.0*sin(M_PI_4), m_rgb_camera_model);
-        const Eigen::Vector3f b_vec = project(center.x + object.h/2.0*cos(M_PI_4), center.y + object.h/2.0*sin(M_PI_4), m_rgb_camera_model);
+        const Eigen::Vector3f t_vec = project(center.x, center.y - object.h/2.0f, m_rgb_camera_model);
+        const Eigen::Vector3f b_vec = project(center.x, center.y + object.h/2.0f, m_rgb_camera_model);
         const Eigen::Vector3f c_vec = (t_vec + b_vec) / 2.0f;
         //}
 
@@ -168,11 +169,10 @@ namespace object_detect
 
         if (publish_debug)
         {
-          /* cv::circle(dbg_img, center, radius, color_highlight(2*blob.color), 2); */
-          cv::rectangle(dbg_img, center, cv::Vec2i(object.w, object.h), cv::Scalar(0, 0, 255), 2);
-          cv::putText(dbg_img, std::to_string(resulting_distance_quality), center+cv::Point(object.w/2.0, object.h/2.0), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", center+cv::Point(object.w/2.0, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", center+cv::Point(object.w/2.0, -object.h/2.0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::rectangle(dbg_img, roi, cv::Scalar(0, 0, 255), 2);
+          cv::putText(dbg_img, std::to_string(resulting_distance_quality), topleft, cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", cv::Point2d(topleft.x, topleft.y-size.height), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", cv::Point2d(topleft.x+size.width, topleft.y-size.height), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
         }
 
         /* cout << "Estimated distance used: " << physical_dimension_known */
@@ -181,7 +181,7 @@ namespace object_detect
         /*      << ", resulting quality: " << resulting_distance_quality << std::endl; */
 
         const Eigen::Vector3f pos_vec = resulting_distance * c_vec.normalized();
-
+        posests.emplace_back(pos_vec, resulting_distance_quality);
       }
       //}
 
@@ -207,14 +207,13 @@ namespace object_detect
         sensor_msgs::PointCloud2Iterator<int16_t> iter_type(pcl_msg, "type");
         sensor_msgs::PointCloud2Iterator<int8_t> iter_dist_qual(pcl_msg, "distance_quality");
 
-        for (size_t it = 0; it < detections.size(); ++it, ++iter_x, ++iter_y, ++iter_z, ++iter_type, ++iter_dist_qual)
+        for (size_t it = 0; it < posests.size(); ++it, ++iter_x, ++iter_y, ++iter_z, ++iter_type, ++iter_dist_qual)
         {
-          const auto& object = detections.at(it);
-          *iter_x = object.position.x();
-          *iter_y = object.position.y();
-          *iter_z = object.position.z();
-          *iter_type = color_id(object.type);
-          *iter_dist_qual = object.dist_qual;
+          const auto& object = posests.at(it);
+          *iter_x = object.first.x();
+          *iter_y = object.first.y();
+          *iter_z = object.first.z();
+          *iter_dist_qual = object.second;
         }
 
         m_pub_pcl.publish(pcl_msg);
@@ -227,13 +226,8 @@ namespace object_detect
         mrs_msgs::PoseWithCovarianceArrayStamped msg;
         msg.header = rgb_img_msg->header;
 
-        for (const auto& det : det_msg.detections)
-        {
-          mrs_msgs::PoseWithCovarianceIdentified pose;
-          pose.pose = det.pose.pose;
-          pose.covariance = pose.covariance;
-          msg.poses.push_back(pose);
-        }
+        for (const auto& det : posests)
+          msg.poses.push_back(to_message(det.first, det.second));
 
         m_pub_posearr.publish(msg);
       }
@@ -343,7 +337,7 @@ namespace object_detect
     const cv::Mat tmp_dm_img = dm_img(roi);
     cv::Mat tmp_dbg_img = publish_debug ? dbg_mat(roi) : cv::Mat();
     const Size size = tmp_dm_img.size();
-    size_t n_candidates = cv::sum(tmp_mask)[0]/255.0;
+    size_t n_candidates = tmp_dbg_img.rows*tmp_dbg_img.cols/255.0;
 
     size_t n_dm_samples = 0;
     std::vector<float> dists;
@@ -384,6 +378,33 @@ namespace object_detect
     {
       return std::numeric_limits<float>::quiet_NaN();
     }
+  }
+  //}
+
+  /* to_output_message() method //{ */
+  mrs_msgs::PoseWithCovarianceIdentified ObjectDetector::to_message(const Eigen::Vector3f& pos, const dist_qual_t dist_qual) const
+  {
+    mrs_msgs::PoseWithCovarianceIdentified ret;
+    mrs_msgs::PoseWithCovarianceIdentified::_pose_type& pose = ret.pose;
+
+    pose.position.x = pos.x();
+    pose.position.y = pos.y();
+    pose.position.z = pos.z();
+    pose.orientation.x = 0;
+    pose.orientation.y = 0;
+    pose.orientation.z = 0;
+    pose.orientation.w = 1;
+
+    if (m_cov_coeffs.find(dist_qual) == std::end(m_cov_coeffs))
+    {
+      ROS_ERROR("[ObjectDetector]: Invalid distance estimate quality %d! Skipping detection.", dist_qual);
+      return ret;
+    }
+    auto [xy_covariance_coeff, z_covariance_coeff] = m_cov_coeffs.at(dist_qual);
+    ret.covariance = generate_covariance(pos, xy_covariance_coeff, z_covariance_coeff);
+    ret.id = dist_qual;
+
+    return ret;
   }
   //}
 

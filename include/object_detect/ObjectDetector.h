@@ -68,8 +68,6 @@ namespace object_detect
   // shortcut type to the dynamic reconfigure manager template instance
   typedef mrs_lib::DynamicReconfigureMgr<object_detect::DetectionParamsConfig> drmgr_t;
 
-  using ros_cov_t = mrs_msgs::PoseWithCovarianceArrayStamped::_poses_type::_covariance_type;
-
   enum dist_qual_t
   {
     unknown_qual = -1,
@@ -84,6 +82,8 @@ namespace object_detect
   class ObjectDetector : public nodelet::Nodelet
   {
 
+    using ros_cov_t = mrs_msgs::PoseWithCovarianceArrayStamped::_poses_type::value_type::_covariance_type;
+
     public:
       ObjectDetector() : m_node_name("ObjectDetector"), m_dm_camera_model_valid(false), m_rgb_camera_model_valid(false) {};
       virtual void onInit();
@@ -94,6 +94,7 @@ namespace object_detect
       static ros_cov_t generate_covariance(const Eigen::Vector3f& pos, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d calc_position_covariance(const Eigen::Vector3d& position_sf, const double xy_covariance_coeff, const double z_covariance_coeff);
       static Eigen::Matrix3d rotate_covariance(const Eigen::Matrix3d& covariance, const Eigen::Matrix3d& rotation);
+      mrs_msgs::PoseWithCovarianceIdentified to_message(const Eigen::Vector3f& pos, const dist_qual_t dist_qual) const;
 
     private:
       // --------------------------------------------------------------
@@ -141,8 +142,6 @@ namespace object_detect
       /* Other variables //{ */
       const std::string m_node_name;
       bool m_is_initialized;
-      std::mutex m_blob_det_mtx;
-      BlobDetector m_blob_det;
       int m_prev_color_id;
       std::unique_ptr<mrs_lib::Profiler> m_profiler_ptr;
       bool m_dm_camera_model_valid;
