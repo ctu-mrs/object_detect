@@ -30,6 +30,7 @@
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <std_srvs/Trigger.h>
+#include <positioning_systems_ros/RtlsTrackerFrame.h>
 
 #include <boost/circular_buffer.hpp>
 
@@ -79,7 +80,11 @@ namespace object_detect
     no_estimate = 0,
     blob_size = 1,
     depthmap = 2,
-    both = 3,
+    terabee = 3,
+    blob_depth = 4,
+    blob_tb = 5,
+    depth_tb = 6,
+    all = 7,
   };
 
   /* //{ class ObjectDetector */
@@ -112,9 +117,8 @@ namespace object_detect
       double m_max_dist_diff;
       double m_min_depth;
       double m_max_depth;
-      std::string m_mask_filename;
-      std::string m_ocl_lut_kernel_file;
       std::map<dist_qual_t, std::pair<double&, double&>> m_cov_coeffs;
+      ros::Duration m_tb_timeout;
       //}
 
       /* ROS related variables (subscribers, timers etc.) //{ */
@@ -129,6 +133,7 @@ namespace object_detect
 
       mrs_lib::SubscribeHandler<visualanalysis_msgs::TargetLocations2D> m_sh_dets;
       mrs_lib::SubscribeHandler<sensor_msgs::Image> m_sh_dm;
+      mrs_lib::SubscribeHandler<positioning_systems_ros::RtlsTrackerFrame> m_sh_tb;
       mrs_lib::SubscribeHandler<sensor_msgs::Image> m_sh_rgb;
       mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_sh_dm_cinfo;
       mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_sh_rgb_cinfo;
@@ -159,6 +164,7 @@ namespace object_detect
       image_geometry::PinholeCameraModel m_rgb_camera_model;
 
       boost::circular_buffer<sensor_msgs::Image::ConstPtr> m_dm_bfr;
+      boost::circular_buffer<positioning_systems_ros::RtlsTrackerFrame::ConstPtr> m_tb_bfr;
 
       cv::Mat m_inv_mask;
       //}

@@ -9,6 +9,9 @@ distance_min_valid_pixels_ratio: 0.05
 object:
   physical_height: 1.9 # metres
 
+terabee:
+  timeout: 0.5 # seconds
+
 debug_image_source: 0
 
  ############### Other parameters ###############
@@ -20,9 +23,13 @@ cov_coeffs:
     no_estimate: 2.5
     blob_size:   0.05
     depthmap:    0.04
-    both:        0.03
+    terabee:     0.04
+    two:         0.03
+    all:         0.02
   z:
     no_estimate: 666.0
     blob_size:   0.5
     depthmap:    0.3
-    both:        0.1
+    terabee:     0.3
+    two:         0.1
+    all:         0.08

@@ -35,6 +35,7 @@
       <remap from="~dm_camera_info" to="$(arg depthmap_cinfo)" />
       <remap from="~rgb_image" to="$(arg color_image)" />
       <remap from="~rgb_camera_info" to="$(arg color_cinfo)" />
+      <remap from="~terabee" to="/rtls_tracker_node/rtls_tracker_frame" />
 
       <remap from="~debug_image" to="~debug_image" />
       <remap from="~detected_objects_pcl" to="~detected_balls_pcl" />

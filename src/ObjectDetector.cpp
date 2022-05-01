@@ -10,12 +10,13 @@ namespace object_detect
 {
 
   /* find_msg() method //{ */
-  sensor_msgs::Image::ConstPtr find_msg(const boost::circular_buffer<sensor_msgs::Image::ConstPtr>& bfr, const ros::Time& stamp)
+  template <typename MsgT>
+  MsgT find_msg(const boost::circular_buffer<MsgT>& bfr, const ros::Time& stamp)
   {
     if (bfr.empty())
       return nullptr;
   
-    sensor_msgs::Image::ConstPtr last_msg = bfr.front();
+    MsgT last_msg = bfr.front();
     for (const auto& msg : bfr)
     {
       if (msg->header.stamp > stamp)
@@ -60,17 +61,25 @@ namespace object_detect
       const std::pair<double&, double&> cov_coeffs_no_estimate = {m_drmgr_ptr->config.cov_coeffs__xy__no_estimate, m_drmgr_ptr->config.cov_coeffs__z__no_estimate};
       const std::pair<double&, double&> cov_coeffs_blob_size = {m_drmgr_ptr->config.cov_coeffs__xy__blob_size, m_drmgr_ptr->config.cov_coeffs__z__blob_size};
       const std::pair<double&, double&> cov_coeffs_depthmap = {m_drmgr_ptr->config.cov_coeffs__xy__depthmap, m_drmgr_ptr->config.cov_coeffs__z__depthmap};
-      const std::pair<double&, double&> cov_coeffs_both = {m_drmgr_ptr->config.cov_coeffs__xy__both, m_drmgr_ptr->config.cov_coeffs__z__both};
+      const std::pair<double&, double&> cov_coeffs_terabee = {m_drmgr_ptr->config.cov_coeffs__xy__terabee, m_drmgr_ptr->config.cov_coeffs__z__terabee};
+      const std::pair<double&, double&> cov_coeffs_two = {m_drmgr_ptr->config.cov_coeffs__xy__two, m_drmgr_ptr->config.cov_coeffs__z__two};
+      const std::pair<double&, double&> cov_coeffs_all = {m_drmgr_ptr->config.cov_coeffs__xy__all, m_drmgr_ptr->config.cov_coeffs__z__all};
+
       m_cov_coeffs.insert_or_assign(dist_qual_t::no_estimate, cov_coeffs_no_estimate);
       m_cov_coeffs.insert_or_assign(dist_qual_t::blob_size, cov_coeffs_blob_size);
       m_cov_coeffs.insert_or_assign(dist_qual_t::depthmap, cov_coeffs_depthmap);
-      m_cov_coeffs.insert_or_assign(dist_qual_t::both, cov_coeffs_both);
+      m_cov_coeffs.insert_or_assign(dist_qual_t::terabee, cov_coeffs_terabee);
+
+      m_cov_coeffs.insert_or_assign(dist_qual_t::blob_depth, cov_coeffs_two);
+      m_cov_coeffs.insert_or_assign(dist_qual_t::blob_tb, cov_coeffs_two);
+      m_cov_coeffs.insert_or_assign(dist_qual_t::depth_tb, cov_coeffs_two);
+
+      m_cov_coeffs.insert_or_assign(dist_qual_t::all, cov_coeffs_all);
     }
 
     //}
 
     const bool rgb_ready = m_rgb_camera_model_valid;
-    bool dm_ready = m_sh_dm.hasMsg() && m_dm_camera_model_valid;
 
     // Check if we got all required messages
     if (rgb_ready)
@@ -80,6 +89,7 @@ namespace object_detect
 
       const auto& detections = det_msg->detections;
 
+      bool dm_ready = m_sh_dm.hasMsg() && m_dm_camera_model_valid;
       cv::Mat dm_img;
       if (dm_ready)
       {
@@ -107,6 +117,15 @@ namespace object_detect
       {
         NODELET_ERROR_THROTTLE(0.5, "[ObjectDetector]: Received RGB image dimensions (%d x %d) are different from the loaded mask (%d x %d)! Cannot continue, skipping image.", rgb_img.rows, rgb_img.cols, m_inv_mask.rows, m_inv_mask.cols);
         return;
+      }
+
+      bool tb_ready = m_sh_tb.hasMsg();
+      positioning_systems_ros::RtlsTrackerFrame::ConstPtr tb_msg = nullptr;
+      if (tb_ready)
+      {
+        tb_msg = find_msg(m_tb_bfr, det_msg->header.stamp);
+        if (tb_msg == nullptr || tb_msg->anchors.empty() || ros::Time::now() - tb_msg->header.stamp > m_tb_timeout)
+          tb_ready = false;
       }
       //}
 
@@ -165,13 +184,24 @@ namespace object_detect
         //}
 
         /* Get distance from depthmap if applicable //{ */
-        float depthmap_distance;
+        float depthmap_distance = 0.0f;
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
           depthmap_distance = estimate_distance_from_depthmap(roi, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           /* cout << "Depthmap distance: " << depthmap_distance << endl; */
           depthmap_distance_valid = distance_valid(depthmap_distance);
+        }
+        //}
+
+        /* Get distance from terabee if applicable //{ */
+        float terabee_distance = 0.0f;
+        bool terabee_distance_valid = false;
+        if (tb_ready)
+        {
+          terabee_distance = tb_msg->anchors.at(0).distance;
+          /* cout << "Terabee distance: " << terabee_distance << endl; */
+          terabee_distance_valid = distance_valid(terabee_distance);
         }
         //}
 
@@ -183,19 +213,84 @@ namespace object_detect
           if (abs(depthmap_distance - estimated_distance) < m_max_dist_diff)
           {
             resulting_distance = depthmap_distance; // assuming this is a more precise distance estimate
-            resulting_distance_quality = dist_qual_t::both;
-            ROS_INFO_THROTTLE(0.5, "[%s]: Using both distance estimates: %.2fm", m_node_name.c_str(), resulting_distance);
+            resulting_distance_quality = dist_qual_t::blob_depth;
           }
         } else if (depthmap_distance_valid)
         {
           resulting_distance = depthmap_distance;
           resulting_distance_quality = dist_qual_t::depthmap;
-          ROS_INFO_THROTTLE(0.5, "[%s]: Using depthmap distance estimate: %.2fm", m_node_name.c_str(), resulting_distance);
         } else if (estimated_distance_valid)
         {
           resulting_distance = estimated_distance;
           resulting_distance_quality = dist_qual_t::blob_size;
-          ROS_INFO_THROTTLE(0.5, "[%s]: Using size-based distance estimate: %.2fm", m_node_name.c_str(), resulting_distance);
+        }
+
+        if (terabee_distance_valid)
+        {
+          // | --------------- no other estimate available -------------- |
+          if (resulting_distance_quality == dist_qual_t::no_estimate)
+          {
+            resulting_distance = terabee_distance; // assuming this is a more precise distance estimate
+            resulting_distance_quality = dist_qual_t::terabee;
+          }
+          // | ------------- both other estimates available ------------- |
+          else if (resulting_distance_quality == dist_qual_t::blob_depth)
+          {
+            if (abs(terabee_distance - estimated_distance) < m_max_dist_diff)
+            {
+              resulting_distance = (resulting_distance + terabee_distance)/2.0; // assuming this is a more precise distance estimate
+              resulting_distance_quality = dist_qual_t::all;
+            }
+            else
+            {
+              resulting_distance_quality = dist_qual_t::no_estimate;
+              ROS_INFO_THROTTLE(0.5, "[%s]: Terabee distance is different from vision! Terabee: %.2fm, vision: %.2fm", m_node_name.c_str(), terabee_distance, resulting_distance);
+              resulting_distance = 0.0f;
+            }
+          }
+          // | ---------------- depth estimate available ---------------- |
+          else if (resulting_distance_quality == dist_qual_t::depthmap)
+          {
+            if (abs(terabee_distance - estimated_distance) < m_max_dist_diff)
+            {
+              resulting_distance = (resulting_distance + terabee_distance)/2.0; // assuming this is a more precise distance estimate
+              resulting_distance_quality = dist_qual_t::depth_tb;
+            }
+            else
+            {
+              resulting_distance_quality = dist_qual_t::no_estimate;
+              ROS_INFO_THROTTLE(0.5, "[%s]: Terabee distance is different from depthmap! Terabee: %.2fm, depthmap: %.2fm", m_node_name.c_str(), terabee_distance, resulting_distance);
+              resulting_distance = 0.0f;
+            }
+          }
+          // | ----------------- blob estimate available ---------------- |
+          else if (resulting_distance_quality == dist_qual_t::blob_size)
+          {
+            if (abs(terabee_distance - estimated_distance) < m_max_dist_diff)
+            {
+              resulting_distance = terabee_distance; // assuming this is a more precise distance estimate
+              resulting_distance_quality = dist_qual_t::blob_tb;
+            }
+            else
+            {
+              resulting_distance_quality = dist_qual_t::no_estimate;
+              ROS_INFO_THROTTLE(0.5, "[%s]: Terabee distance is different from blob size! Terabee: %.2fm, blob: %.2fm", m_node_name.c_str(), terabee_distance, resulting_distance);
+              resulting_distance = 0.0f;
+            }
+          }
+        }
+
+        switch (resulting_distance_quality)
+        {
+          case dist_qual_t::unknown_qual: ROS_ERROR_THROTTLE(0.5, "[%s]: Error in distance estimation selection!", m_node_name.c_str()); break;
+          case dist_qual_t::no_estimate: ROS_WARN_THROTTLE(0.5, "[%s]: No consistent distance estimate", m_node_name.c_str()); break;
+          case dist_qual_t::blob_size: ROS_INFO_THROTTLE(0.5, "[%s]: Using size-based distance estimate: %.2fm", m_node_name.c_str(), resulting_distance); break;
+          case dist_qual_t::depthmap: ROS_INFO_THROTTLE(0.5, "[%s]: Using depthmap distance estimate: %.2fm", m_node_name.c_str(), resulting_distance); break;
+          case dist_qual_t::terabee: ROS_INFO_THROTTLE(0.5, "[%s]: Using terabee distance estimate: %.2fm", m_node_name.c_str(), resulting_distance); break;
+          case dist_qual_t::blob_depth: ROS_INFO_THROTTLE(0.5, "[%s]: Using size-based and depthmap distance estimate: %.2fm", m_node_name.c_str(), resulting_distance); break;
+          case dist_qual_t::blob_tb: ROS_INFO_THROTTLE(0.5, "[%s]: Using size-based and terabee distance estimate: %.2fm", m_node_name.c_str(), resulting_distance); break;
+          case dist_qual_t::depth_tb: ROS_INFO_THROTTLE(0.5, "[%s]: Using depthmap and terabee distance estimate: %.2fm", m_node_name.c_str(), resulting_distance); break;
+          case dist_qual_t::all: ROS_INFO_THROTTLE(0.5, "[%s]: Using all distance estimates: %.2fm", m_node_name.c_str(), resulting_distance); break;
         }
         //}
 
@@ -478,7 +573,7 @@ namespace object_detect
     pl.loadParam("max_dist_diff", m_max_dist_diff);
     pl.loadParam("min_depth", m_min_depth);
     pl.loadParam("max_depth", m_max_depth);
-    pl.loadParam("mask_filename", m_mask_filename, ""s);
+    pl.loadParam("terabee/timeout", m_tb_timeout);
 
     if (!m_drmgr_ptr->loaded_successfully())
     {
@@ -511,6 +606,10 @@ namespace object_detect
         {
           m_dm_bfr.push_back(sh.getMsg());
         });
+    mrs_lib::construct_object(m_sh_tb, shopts, "terabee", [this](mrs_lib::SubscribeHandler<positioning_systems_ros::RtlsTrackerFrame>& sh)
+        {
+          m_tb_bfr.push_back(sh.getMsg());
+        });
     mrs_lib::construct_object(m_sh_dm_cinfo, shopts, "dm_camera_info");
     mrs_lib::construct_object(m_sh_rgb_cinfo, shopts, "rgb_camera_info");
 
@@ -521,6 +620,7 @@ namespace object_detect
     //}
 
     m_dm_bfr.set_capacity(30);
+    m_tb_bfr.set_capacity(30);
     m_is_initialized = true;
 
     ROS_INFO("[%s]: Initialized ------------------------------", m_node_name.c_str());

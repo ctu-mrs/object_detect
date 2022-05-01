@@ -22,6 +22,7 @@
   <depend>nodelet</depend>
   <depend>image_transport</depend>
   <depend>visualanalysis_msgs</depend>
+  <depend>positioning_systems_ros</depend>
 
   <build_depend>message_generation</build_depend>
 
