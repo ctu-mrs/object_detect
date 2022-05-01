@@ -184,17 +184,26 @@ namespace object_detect
           {
             resulting_distance = depthmap_distance; // assuming this is a more precise distance estimate
             resulting_distance_quality = dist_qual_t::both;
+            ROS_INFO_THROTTLE(0.5, "[%s]: Using both distance estimates: %.2fm", m_node_name.c_str(), resulting_distance);
           }
         } else if (depthmap_distance_valid)
         {
           resulting_distance = depthmap_distance;
           resulting_distance_quality = dist_qual_t::depthmap;
+          ROS_INFO_THROTTLE(0.5, "[%s]: Using depthmap distance estimate: %.2fm", m_node_name.c_str(), resulting_distance);
         } else if (estimated_distance_valid)
         {
           resulting_distance = estimated_distance;
           resulting_distance_quality = dist_qual_t::blob_size;
+          ROS_INFO_THROTTLE(0.5, "[%s]: Using size-based distance estimate: %.2fm", m_node_name.c_str(), resulting_distance);
         }
         //}
+
+        if (resulting_distance_quality == dist_qual_t::no_estimate)
+        {
+          continue;
+          ROS_INFO_THROTTLE(0.5, "[%s]: No distance estimate available, skipping detection.", m_node_name.c_str());
+        }
 
         if (publish_debug)
         {
@@ -342,7 +351,7 @@ namespace object_detect
   /* distance_valid() method //{ */
   bool ObjectDetector::distance_valid(float distance)
   {
-    return !(isnan(distance) || distance < 0.0 || distance > m_max_dist);
+    return !(isnan(distance) || distance <= 0.0 || distance > m_max_dist);
   }
   //}
 
@@ -368,10 +377,14 @@ namespace object_detect
     const int br_x = std::clamp(roi.br().x, 0, dm_img.cols-1);
     const int br_y = std::clamp(roi.br().y, 0, dm_img.rows-1);
     const cv::Rect roi_clamped(cv::Point(tl_x, tl_y), cv::Point(br_x, br_y));
+    if (tl_x >= br_x || tl_y >= br_y)
+      return 0.0f;
     const cv::Mat tmp_dm_img = dm_img(roi_clamped);
-    cv::Mat tmp_dbg_img = publish_debug ? dbg_mat(roi) : cv::Mat();
+    cv::Mat tmp_dbg_img = publish_debug ? dbg_mat(roi_clamped) : cv::Mat();
     const Size size = tmp_dm_img.size();
-    size_t n_candidates = tmp_dm_img.rows*tmp_dm_img.cols/255.0;
+    size_t n_candidates = tmp_dm_img.rows*tmp_dm_img.cols;
+    if (n_candidates == 0)
+      return 0.0f;
 
     size_t n_dm_samples = 0;
     std::vector<float> dists;
@@ -387,8 +400,8 @@ namespace object_detect
         if (depth <= m_min_depth
          || depth >= m_max_depth)
           continue;
-        const float u = roi.tl().x + x;
-        const float v = roi.tl().y + y;
+        const float u = roi_clamped.tl().x + x;
+        const float v = roi_clamped.tl().y + y;
         const float dist = depth2range(depth, u, v, m_dm_camera_model.fx(), m_dm_camera_model.fy(), m_dm_camera_model.cx(), m_dm_camera_model.cy());
         if (std::isnan(dist))
           ROS_WARN("[ObjectDetector]: Distance is nan! Skipping.");
