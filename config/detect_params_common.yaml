@@ -1,6 +1,6 @@
 ############### Distance estimation parameters ###############
 # distance estimation from object size parameters
-max_dist: 10.0
+max_dist: 14.0
 max_dist_diff: 4.0
 # depthmap parameters
 min_depth: 200 # millimetres
