@@ -26,7 +26,7 @@
     <node pkg="nodelet" type="nodelet" name="object_detect" args="$(arg nodelet_load)" output="screen" launch-prefix="$(arg launch_prefix_debug) $(arg launch_prefix_profile) nice -n 19" respawn="$(arg respawn)" >
       
       <rosparam file="$(find object_detect)/config/detect_params_common.yaml" />
-      <rosparam file="$(find object_detect)/config/balls/kurwa.yaml" />
+      <rosparam file="$(find object_detect)/config/balls/Pink.yaml" />
       <param name="mask_filename" value="" />
 
       <param name="ocl_lut_kernel_file" value="$(find object_detect)/src/ocl_lut_kernel.cl" />
@@ -37,8 +37,8 @@
       <remap from="~rgb_camera_info" to="$(arg color_cinfo)" />
 
       <remap from="~debug_image" to="~debug_image" />
-      <remap from="~detected_objects_pcl" to="~detected_balls_pcl" />
-      <remap from="~detected_objects" to="~detected_balls" />
+      <remap from="~detected_balls_pcl" to="~detected_balls_pcl2" />
+      <remap from="~detected_balls" to="~detected_balls2" />
 
     </node>
   

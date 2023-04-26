@@ -1,2 +1,5 @@
 # this changes a lot so rather ignore it
 *.rviz
+
+# vim swap files
+*.swp

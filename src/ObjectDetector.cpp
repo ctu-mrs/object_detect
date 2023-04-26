@@ -172,7 +172,7 @@ namespace object_detect
         bool depthmap_distance_valid = false;
         if (dm_ready)
         {
-          depthmap_distance = estimate_distance_from_depthmap(c_vec, l_vec, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
+          depthmap_distance = estimate_distance_from_depthmap(c_vec, l_vec, m_drmgr_ptr->config.distance_depth_inflate_radius, m_drmgr_ptr->config.distance_min_valid_pixels_ratio, dm_img, (publish_debug && publish_debug_dm) ? dbg_img : cv::noArray());
           /* cout << "Depthmap distance: " << depthmap_distance << endl; */
           depthmap_distance_valid = distance_valid(depthmap_distance);
         }
@@ -213,8 +213,8 @@ namespace object_detect
           /* cv::circle(dbg_img, center, radius, color_highlight(2*blob.color), 2); */
           cv::circle(dbg_img, dbg_center, dbg_radius, cv::Scalar(0, 0, 255), 2);
           cv::putText(dbg_img, std::to_string(resulting_distance_quality), dbg_center+cv::Point(dbg_radius, dbg_radius), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(estimated_distance)+"m", dbg_center+cv::Point(dbg_radius, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
-          cv::putText(dbg_img, std::to_string(depthmap_distance)+"m", dbg_center+cv::Point(dbg_radius, -dbg_radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, estimated_distance_valid ? (std::to_string(estimated_distance)+"m") : "-", dbg_center+cv::Point(dbg_radius, 0), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
+          cv::putText(dbg_img, depthmap_distance_valid ? (std::to_string(depthmap_distance)+"m") : "-", dbg_center+cv::Point(dbg_radius, -dbg_radius), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255));
         }
 
         /* cout << "Estimated distance used: " << physical_dimension_known */
@@ -432,7 +432,7 @@ namespace object_detect
   //}
 
   /* estimate_distance_from_depthmap() method //{ */
-  float ObjectDetector::estimate_distance_from_depthmap(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img)
+  float ObjectDetector::estimate_distance_from_depthmap(const Eigen::Vector3f& c_vec, const Eigen::Vector3f& b_vec, const double inflate_radius, const double min_valid_ratio, const cv::Mat& dm_img, cv::InputOutputArray dbg_img)
   {
     bool publish_debug = dbg_img.needed();
     cv::Mat dbg_mat;
@@ -442,7 +442,7 @@ namespace object_detect
     // recalculate the area to coordinates in the depthmap
     const cv::Point2f area_center = m_dm_camera_model.project3dToPixel({c_vec.x(), c_vec.y(), c_vec.z()});
     const cv::Point2f area_border = m_dm_camera_model.project3dToPixel({b_vec.x(), b_vec.y(), b_vec.z()});
-    const float area_radius = cv::norm(area_border - area_center);
+    const float area_radius = cv::norm(area_border - area_center) + inflate_radius;
 
     const cv::Rect roi = circle_roi_clamped(area_center, area_radius, dm_img.size());
     const cv::Mat tmp_mask = circle_mask(area_center, area_radius, roi);
