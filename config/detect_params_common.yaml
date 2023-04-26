@@ -16,9 +16,9 @@ use_ocl: true # whether to use OpenCL hardware acceleration
 cov_coeffs:
   xy:
     no_estimate: 2.5
-    blob_size:   0.05
-    depthmap:    0.04
-    both:        0.03
+    blob_size:   0.15
+    depthmap:    0.12
+    both:        0.09
   z:
     no_estimate: 666.0
     blob_size:   0.5
