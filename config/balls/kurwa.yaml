@@ -1,0 +1,18 @@
+ball:
+  binarization_method_name: HSV
+  hsv:
+    hue_center: 81.73310236471069
+    hue_range: 82.43854850896628
+    sat_center: 25.954576462438098
+    sat_range: 110.27750753625291
+    val_center: 248.65853536913386
+    val_range: 227.9876632312688
+  lab:
+    a_center: 140.0632408759276
+    a_range: 50.734627593398145
+    b_center: 121.16416040174886
+    b_range: 42.58421518713092
+    l_center: 234.55516740386042
+    l_range: 314.3538288242623
+  physical_diameter: 0.4
+  segment_color_name: kurwa

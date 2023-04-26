@@ -1,0 +1,18 @@
+ball:
+  binarization_method_name: HSV
+  hsv:
+    hue_center: 0.0
+    hue_range: -0.0
+    sat_center: 0.0
+    sat_range: 0.0
+    val_center: 253.99598214285714
+    val_range: 15.580559249610147
+  lab:
+    a_center: 128.0
+    a_range: 0.0
+    b_center: 128.0
+    b_range: 0.0
+    l_center: 253.99665178571428
+    l_range: 12.9255990071593
+  physical_diameter: 0.4
+  segment_color_name: frantapinkgrass

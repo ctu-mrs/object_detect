@@ -1,0 +1,18 @@
+ball:
+  binarization_method_name: HSV
+  hsv:
+    hue_center: 171.242725337067
+    hue_range: 97.32319765417435
+    sat_center: 16.29004881071254
+    sat_range: 201.56522852372044
+    val_center: 254.06975923324183
+    val_range: 48.95966019632218
+  lab:
+    a_center: 136.29276046607112
+    a_range: 87.50998884223034
+    b_center: 122.55615641525111
+    b_range: 55.99964276869373
+    l_center: 244.3522451872882
+    l_range: 101.87117621970205
+  physical_diameter: 0.4
+  segment_color_name: frantapink
