@@ -1,0 +1,18 @@
+ball:
+  binarization_method_name: LAB
+  hsv:
+    hue_center: 165.4164451288407
+    hue_range: 37.470082144477814
+    sat_center: 136.9142857142857
+    sat_range: 267.5859835401084
+    val_center: 225.78095238095239
+    val_range: 2600.519535367637
+  lab:
+    a_center: 178.85494505494506
+    a_range: 86.4797676833873
+    b_center: 122.97655677655678
+    b_range: 31.633859929998497
+    l_center: 157.35238095238094
+    l_range: 3121.289490088181
+  physical_diameter: 0.28
+  segment_color_name: cisarpink
