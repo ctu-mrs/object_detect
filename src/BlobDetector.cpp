@@ -284,11 +284,11 @@ void BlobDetector::preprocess_image(cv::Mat& inout_img) const
 std::vector<BallCandidate> BlobDetector::detect_candidates(cv::Mat in_img, cv::OutputArray p_labels_img, cv::InputArray inv_mask)
 {
 #ifdef ENABLE_PROFILING
-  ros::WallTime t_start = ros::WallTime::now();
+  const ros::WallTime t_start = ros::WallTime::now();
 #endif
   preprocess_image(in_img);
 #ifdef ENABLE_PROFILING
-  ros::WallTime t_preprocess = ros::WallTime::now();
+  const ros::WallTime t_preprocess = ros::WallTime::now();
 #endif
 
   cv::Mat seg_img;
@@ -296,11 +296,18 @@ std::vector<BallCandidate> BlobDetector::detect_candidates(cv::Mat in_img, cv::O
     seg_img = segment_ranges(in_img, p_labels_img);
   else
     seg_img = segment_lut(in_img, p_labels_img);
+#ifdef ENABLE_PROFILING
+  const ros::WallTime t_segment = ros::WallTime::now();
+#endif
 
   if (!inv_mask.empty())
     seg_img.setTo(0, inv_mask);
   const uint8_t label = 1;
   postprocess_binary_image(seg_img);
+#ifdef ENABLE_PROFILING
+  const ros::WallTime t_postprocess = ros::WallTime::now();
+#endif
+
   const std::vector<Blob> blobs = find_blobs(seg_img, label);
   const auto balls = blobs_to_balls(blobs);
   if (p_labels_img.needed())
@@ -308,15 +315,19 @@ std::vector<BallCandidate> BlobDetector::detect_candidates(cv::Mat in_img, cv::O
     const cv::Mat tmp_img = seg_img/255*label;
     cv::bitwise_or(p_labels_img, tmp_img, p_labels_img);
   }
+#ifdef ENABLE_PROFILING
+  const ros::WallTime t_findblobs = ros::WallTime::now();
+#endif
 
 #ifdef ENABLE_PROFILING
   ros::WallTime t_finish = ros::WallTime::now();
-  const std::string ocl_str = ocl_success ? " (with OpenCL)" : "";
+  const std::string ocl_str = m_use_ocl ? " (with OpenCL)" : "";
   const double preproc_ms = (t_preprocess - t_start).toSec()*1000.0;
-  /* const double segment_ms = (t_segment - t_preprocess).toSec()*1000.0; */
-  const double fblobs_ms = (t_findblobs - t_finish).toSec()*1000.0;
-  const double total_ms = (m_t_finish - t_start).toSec()*1000.0;
-  ROS_INFO("[BlobDetector]: profiling%s\n\tpreproc:\t%.2f\n\tfblobs:\t%.2f\n\tfinish:%.2f\n\ttotal:%.2f", ocl_str.c_str(), preproc_ms, segment_ms, finish_ms, total_ms);
+  const double segment_ms = (t_segment - t_preprocess).toSec()*1000.0;
+  const double postproc_ms = (t_postprocess - t_segment).toSec()*1000.0;
+  const double fblobs_ms = (t_findblobs - t_postprocess).toSec()*1000.0;
+  const double total_ms = (t_finish - t_start).toSec()*1000.0;
+  ROS_INFO("[BlobDetector]: profiling%s\n\tpreproc:\t%.2f\n\tsegment:\t%.2f\n\tpostproc:\t%.2f\n\tfblobs:\t%.2f\n\ttotal:\t%.2f", ocl_str.c_str(), preproc_ms, segment_ms, postproc_ms, fblobs_ms, total_ms);
 #endif
   return balls;
 }
