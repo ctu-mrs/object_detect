@@ -19,7 +19,7 @@
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
-#include <mrs_lib/ParamLoader.h>
+#include <mrs_lib/param_loader.h>
 #include <mrs_lib/subscribe_handler.h>
 #include "object_detect/lut.h"
 
@@ -28,50 +28,48 @@ using namespace std;
 using namespace object_detect;
 
 std::mutex global_mtx;
-cv::Mat global_image;
-bool global_image_valid = false;
+cv::Mat    global_image;
+bool       global_image_valid = false;
 
 std::mutex global_hist_mtx;
-cv::Mat global_hist;
-bool global_hist_valid = false;
-cv::Mat global_lut;
+cv::Mat    global_hist;
+bool       global_hist_valid = false;
+cv::Mat    global_lut;
 
 /* helper functions etc //{ */
 
-bool pause_img = false;
+bool pause_img             = false;
 bool show_correction_delay = true;
-bool clear_colors = false;
-struct Option {const int key; bool& option; const std::string txt, op1, op2;};
-static const std::vector<Option> options =
+bool clear_colors          = false;
+struct Option
 {
-  {' ', pause_img, "pausing", "not ", ""},
-  {'c', clear_colors, "clearing colors", "not ", ""},
-  {'t', show_correction_delay, "showing time since last correction", "not ", ""},
+  const int         key;
+  bool&             option;
+  const std::string txt, op1, op2;
 };
-void print_options()
-{
+static const std::vector<Option> options = {
+    {' ', pause_img, "pausing", "not ", ""},
+    {'c', clear_colors, "clearing colors", "not ", ""},
+    {'t', show_correction_delay, "showing time since last correction", "not ", ""},
+};
+void print_options() {
   ROS_INFO("Options (change by selecting the OpenCV window and pressing the corresponding key)");
   std::cout << "key:\ttoggles:" << std::endl;
   std::cout << "----------------------------" << std::endl;
-  for (const auto& opt : options)
-  {
+  for (const auto& opt : options) {
     std::cout << ' ' << char(opt.key) << '\t' << opt.txt << std::endl;
   }
 }
-void eval_keypress(int key)
-{
-  for (const auto& opt : options)
-  {
-    if (key == opt.key)
-    {
-      ROS_INFO(("%s" + opt.txt).c_str(), opt.option?opt.op1.c_str():opt.op2.c_str());
+void eval_keypress(int key) {
+  for (const auto& opt : options) {
+    if (key == opt.key) {
+      ROS_INFO(("%s" + opt.txt).c_str(), opt.option ? opt.op1.c_str() : opt.op2.c_str());
       opt.option = !opt.option;
     }
   }
 }
 
-cv::Mat segment_img()
-{
+cv::Mat segment_img() {
   cv::Mat img, lut;
   {
     std::scoped_lock lck(global_mtx, global_hist_mtx);
@@ -79,11 +77,10 @@ cv::Mat segment_img()
     global_lut.copyTo(lut);
   }
   cv::cvtColor(img, img, COLOR_BGR2HSV);
-  for (auto it = img.begin<Vec3b>(); it != img.end<Vec3b>(); it++)
-  {
-    const uint8_t h = (*it)(0);
-    const uint8_t s = (*it)(1);
-    const uint8_t lutval = lut.at<uint8_t>(h/2, s/2);
+  for (auto it = img.begin<Vec3b>(); it != img.end<Vec3b>(); it++) {
+    const uint8_t h      = (*it)(0);
+    const uint8_t s      = (*it)(1);
+    const uint8_t lutval = lut.at<uint8_t>(h / 2, s / 2);
     if (lutval)
       *it = Vec3b(255, 255, 255);
     else
@@ -94,22 +91,21 @@ cv::Mat segment_img()
 
 /* recalc_hist_hsv() //{ */
 
-void recalc_hist_hsv(const std::vector<cv::Vec3b>& colors)
-{
+void recalc_hist_hsv(const std::vector<cv::Vec3b>& colors) {
   cv::Mat hsv;
   cv::cvtColor(colors, hsv, COLOR_BGR2HSV);
-  int hbins = 90, sbins = 128;
-  int histSize[] = {hbins, sbins};
-  float hranges[] = { 0, 180 };
-  float sranges[] = { 0, 256 };
-  const float* ranges[] = { hranges, sranges };
-  int channels[] = {0, 1};
+  int              hbins = 90, sbins = 128;
+  int              histSize[] = {hbins, sbins};
+  float            hranges[]  = {0, 180};
+  float            sranges[]  = {0, 256};
+  const float*     ranges[]   = {hranges, sranges};
+  int              channels[] = {0, 1};
   std::scoped_lock lck(global_hist_mtx);
-  calcHist( &hsv, 1, channels, Mat(), // do not use mask
+  calcHist(&hsv, 1, channels, Mat(),  // do not use mask
            global_hist, 2, histSize, ranges,
-           true, // the histogram is uniform
-           true  // accumulate
-           );
+           true,  // the histogram is uniform
+           true   // accumulate
+  );
   global_hist_valid = true;
   std::cout << "recalculated histogram" << std::endl;
   if (global_lut.empty())
@@ -120,8 +116,7 @@ void recalc_hist_hsv(const std::vector<cv::Vec3b>& colors)
 
 /* clear_hist() //{ */
 
-void clear_hist()
-{
+void clear_hist() {
   std::scoped_lock lck(global_hist_mtx);
   global_hist.setTo(Scalar(0.0));
   global_lut.setTo(Scalar(0));
@@ -132,37 +127,28 @@ void clear_hist()
 
 /* color mouse callback etc //{ */
 
-void add_color_selection(cv::Point selection_start, cv::Point selection_end)
-{
+void add_color_selection(cv::Point selection_start, cv::Point selection_end) {
   std::scoped_lock lck(global_mtx);
-  if (!global_image_valid)
-  {
+  if (!global_image_valid) {
     std::cerr << "no image received yet, cannot add selection" << std::endl;
     return;
   }
-  selection_start.x = std::clamp(selection_start.x, 0, global_image.cols-1);
-  selection_start.y = std::clamp(selection_start.y, 0, global_image.rows-1);
-  selection_end.x = std::clamp(selection_end.x, 0, global_image.cols-1);
-  selection_end.y = std::clamp(selection_end.y, 0, global_image.rows-1);
+  selection_start.x = std::clamp(selection_start.x, 0, global_image.cols - 1);
+  selection_start.y = std::clamp(selection_start.y, 0, global_image.rows - 1);
+  selection_end.x   = std::clamp(selection_end.x, 0, global_image.cols - 1);
+  selection_end.y   = std::clamp(selection_end.y, 0, global_image.rows - 1);
   cv::Rect sel(selection_start, selection_end);
 
   std::vector<cv::Vec3b> colors;
-  if (sel.br() == sel.tl())
-  {
+  if (sel.br() == sel.tl()) {
     colors.push_back(global_image.at<cv::Vec3b>(sel.br()));
-  }
-  else if (sel.br().x == sel.tl().x)
-  {
+  } else if (sel.br().x == sel.tl().x) {
     for (int it = sel.tl().x; it < sel.br().x; it++)
       colors.push_back(global_image.at<cv::Vec3b>(sel.br().y, it));
-  }
-  else if (sel.br().y == sel.tl().y)
-  {
+  } else if (sel.br().y == sel.tl().y) {
     for (int it = sel.tl().y; it < sel.br().y; it++)
       colors.push_back(global_image.at<cv::Vec3b>(it, sel.br().x));
-  }
-  else
-  {
+  } else {
     cv::Mat roid = global_image(sel);
     for (auto it = roid.begin<cv::Vec3b>(); it != roid.end<cv::Vec3b>(); it++)
       colors.push_back(*it);
@@ -175,17 +161,13 @@ void add_color_selection(cv::Point selection_start, cv::Point selection_end)
 cv::Point cursor_pos;
 cv::Point selection_start;
 cv::Point selection_end;
-bool prev_lmouse = false;
-void color_mouse_callback([[maybe_unused]] int event, int x, int y, [[maybe_unused]]int flags, [[maybe_unused]]void* userdata)
-{
-  cursor_pos = cv::Point(x, y);
+bool      prev_lmouse = false;
+void      color_mouse_callback([[maybe_unused]] int event, int x, int y, [[maybe_unused]] int flags, [[maybe_unused]] void* userdata) {
+  cursor_pos        = cv::Point(x, y);
   const bool lmouse = flags & EVENT_FLAG_LBUTTON;
-  if (lmouse)
-  {
+  if (lmouse) {
     selection_end = cursor_pos;
-  }
-  else
-  {
+  } else {
     if (prev_lmouse)
       add_color_selection(selection_start, selection_end);
     selection_start = cursor_pos;
@@ -197,11 +179,9 @@ void color_mouse_callback([[maybe_unused]] int event, int x, int y, [[maybe_unus
 
 /* hist mouse callback etc //{ */
 
-void add_hist_selection(cv::Point selection_start, cv::Point selection_end)
-{
+void add_hist_selection(cv::Point selection_start, cv::Point selection_end) {
   std::scoped_lock lck(global_hist_mtx);
-  if (!global_hist_valid)
-  {
+  if (!global_hist_valid) {
     std::cerr << "no histogram valid yet, cannot add selection" << std::endl;
     return;
   }
@@ -209,11 +189,9 @@ void add_hist_selection(cv::Point selection_start, cv::Point selection_end)
   cv::rectangle(global_lut, selection_start, selection_end, Scalar(255), -1);
 }
 
-void remove_hist_selection(cv::Point selection_start, cv::Point selection_end)
-{
+void remove_hist_selection(cv::Point selection_start, cv::Point selection_end) {
   std::scoped_lock lck(global_hist_mtx);
-  if (!global_hist_valid)
-  {
+  if (!global_hist_valid) {
     std::cerr << "no histogram valid yet, cannot remove selection" << std::endl;
     return;
   }
@@ -225,34 +203,27 @@ cv::Point hist_cursor_pos;
 
 cv::Point hist_lselection_start;
 cv::Point hist_lselection_end;
-bool hist_prev_lmouse = false;
+bool      hist_prev_lmouse = false;
 
 cv::Point hist_rselection_start;
 cv::Point hist_rselection_end;
-bool hist_prev_rmouse = false;
-void hist_mouse_callback([[maybe_unused]] int event, int x, int y, [[maybe_unused]]int flags, [[maybe_unused]]void* userdata)
-{
-  hist_cursor_pos = cv::Point(x, y);
+bool      hist_prev_rmouse = false;
+void      hist_mouse_callback([[maybe_unused]] int event, int x, int y, [[maybe_unused]] int flags, [[maybe_unused]] void* userdata) {
+  hist_cursor_pos   = cv::Point(x, y);
   const bool lmouse = flags & EVENT_FLAG_LBUTTON;
   const bool rmouse = flags & EVENT_FLAG_RBUTTON;
-  if (lmouse)
-  {
+  if (lmouse) {
     hist_lselection_end = hist_cursor_pos;
-  }
-  else
-  {
+  } else {
     if (hist_prev_lmouse)
       add_hist_selection(hist_lselection_start, hist_lselection_end);
     hist_lselection_start = hist_cursor_pos;
   }
   hist_prev_lmouse = lmouse;
 
-  if (rmouse)
-  {
+  if (rmouse) {
     hist_rselection_end = hist_cursor_pos;
-  }
-  else
-  {
+  } else {
     if (hist_prev_rmouse)
       remove_hist_selection(hist_rselection_start, hist_rselection_end);
     hist_rselection_start = hist_cursor_pos;
@@ -262,27 +233,25 @@ void hist_mouse_callback([[maybe_unused]] int event, int x, int y, [[maybe_unuse
 
 //}
 
-std::string to_str_prec(double num, unsigned prec = 3)
-{
+std::string to_str_prec(double num, unsigned prec = 3) {
   std::stringstream strstr;
   strstr << std::fixed << std::setprecision(prec);
   strstr << num;
   return strstr.str();
 }
 
-template<int N>
-void SetChannel(Mat &img, unsigned char newVal) {   
-    for(int x=0;x<img.cols;x++) {
-        for(int y=0;y<img.rows;y++) {
-            *(img.data + (y * img.cols + x) * img.channels() + N) = newVal;
-        }
+template <int N>
+void SetChannel(Mat& img, unsigned char newVal) {
+  for (int x = 0; x < img.cols; x++) {
+    for (int y = 0; y < img.rows; y++) {
+      *(img.data + (y * img.cols + x) * img.channels() + N) = newVal;
     }
+  }
 }
 
 //}
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
   ros::init(argc, argv, "cpicker");
   ROS_INFO("Node initialized.");
 
@@ -291,8 +260,7 @@ int main(int argc, char** argv)
   {
     std::cout << "Waiting for valid time..." << std::endl;
     ros::Rate r(10);
-    while (!ros::Time::isValid())
-    {
+    while (!ros::Time::isValid()) {
       r.sleep();
       ros::spinOnce();
     }
@@ -301,15 +269,23 @@ int main(int argc, char** argv)
   mrs_lib::ParamLoader pl(nh);
   /* const double object_radius = pl.load_param2<double>("object_radius"); */
 
-  mrs_lib::SubscribeMgr smgr(nh, "cpicker");
-  auto sh_img = smgr.create_handler<sensor_msgs::Image>("image_in", ros::Duration(5.0));
+  mrs_lib::SubscribeHandlerOptions shopts;
+  shopts.nh                 = nh;
+  shopts.node_name          = "ColorPicker";
+  shopts.no_message_timeout = ros::Duration(1.0);
+  shopts.threadsafe         = true;
+  shopts.autostart          = true;
+  shopts.queue_size         = 10;
+  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+
+  auto sh_img = mrs_lib::SubscribeHandler<sensor_msgs::Image>(shopts, "image_in", ros::Duration(5.0));
   /* auto sh_cinfo = smgr.create_handler<sensor_msgs::CameraInfo>("camera_info", ros::Duration(5.0)); */
 
   print_options();
 
   /* int window_flags = WINDOW_AUTOSIZE | WINDOW_KEEPRATIO | WINDOW_GUI_NORMAL; */
-  int window_flags = WINDOW_NORMAL | WINDOW_KEEPRATIO | WINDOW_GUI_EXPANDED;
-  std::string window_name = "cpicker";
+  int         window_flags = WINDOW_NORMAL | WINDOW_KEEPRATIO | WINDOW_GUI_EXPANDED;
+  std::string window_name  = "cpicker";
   cv::namedWindow(window_name, window_flags);
   cv::setMouseCallback(window_name, color_mouse_callback, NULL);
 
@@ -321,20 +297,17 @@ int main(int argc, char** argv)
   cv::namedWindow(seg_window_name, window_flags);
   ros::Rate r(100);
 
-  while (ros::ok())
-  {
+  while (ros::ok()) {
     ros::spinOnce();
 
-    if (sh_img->has_data())
-    {
+    if (sh_img.hasMsg()) {
       if (clear_colors)
         clear_hist();
-      sensor_msgs::ImageConstPtr img_ros = sh_img->get_data();
+      sensor_msgs::ImageConstPtr  img_ros  = sh_img.getMsg();
       const cv_bridge::CvImagePtr img_ros2 = cv_bridge::toCvCopy(img_ros, "bgr8");
-      if (!pause_img)
-      {
+      if (!pause_img) {
         std::scoped_lock lck(global_mtx);
-        global_image = img_ros2->image;
+        global_image       = img_ros2->image;
         global_image_valid = true;
       }
 
@@ -342,13 +315,12 @@ int main(int argc, char** argv)
         cv::Mat img;
         global_image.copyTo(img);
         if (prev_lmouse)
-          cv::rectangle(img, selection_start, selection_end, Scalar(0,0,255), 2);
+          cv::rectangle(img, selection_start, selection_end, Scalar(0, 0, 255), 2);
         cv::imshow(window_name, img);
         eval_keypress(cv::waitKey(1));
       }
 
-      if (global_hist_valid)
-      {
+      if (global_hist_valid) {
         cv::Mat hist_img;
         cv::Mat lut_img;
         {
@@ -361,16 +333,16 @@ int main(int argc, char** argv)
 
         cv::log(hist_img, hist_img);
         double min, max;
-        cv::minMaxLoc(hist_img, &min, &max); 
+        cv::minMaxLoc(hist_img, &min, &max);
 
-        hist_img.convertTo(hist_img, CV_8U, 255/(max-min), -255*min/(max-min));
+        hist_img.convertTo(hist_img, CV_8U, 255 / (max - min), -255 * min / (max - min));
         cv::Mat show_img;
         cv::addWeighted(hist_img, 0.7, lut_img, 0.3, 0.0, show_img);
 
         if (hist_prev_lmouse)
-          cv::rectangle(show_img, hist_lselection_start, hist_lselection_end, Scalar(255,0,0), 1);
+          cv::rectangle(show_img, hist_lselection_start, hist_lselection_end, Scalar(255, 0, 0), 1);
         if (hist_prev_rmouse)
-          cv::rectangle(show_img, hist_rselection_start, hist_rselection_end, Scalar(0,0,255), 1);
+          cv::rectangle(show_img, hist_rselection_start, hist_rselection_end, Scalar(0, 0, 255), 1);
         cv::imshow(hist_window_name, show_img);
         eval_keypress(cv::waitKey(1));
 
@@ -383,5 +355,4 @@ int main(int argc, char** argv)
     r.sleep();
   }
 }
-
 

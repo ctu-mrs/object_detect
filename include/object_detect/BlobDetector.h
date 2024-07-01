@@ -9,7 +9,7 @@
 
 // set OpenCL desired version to 2.2
 #define CL_TARGET_OPENCL_VERSION 220
-#include <CL/cl.h>
+#include <CL/cl.hpp>
 
 #include <fstream>
 
